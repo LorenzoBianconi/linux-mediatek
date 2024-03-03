@@ -53,6 +53,7 @@ properties:
               - mediatek,mt8195-pcie
           - const: mediatek,mt8192-pcie
       - const: mediatek,mt8192-pcie
+      - const: airoha,en7581-pcie
 
   reg:
     maxItems: 1
@@ -85,11 +86,11 @@ properties:
       enum: [ phy, mac ]
 
   clocks:
-    minItems: 4
+    minItems: 1
     maxItems: 6
 
   clock-names:
-    minItems: 4
+    minItems: 1
     maxItems: 6
 
   assigned-clocks:
@@ -186,6 +187,14 @@ allOf:
             - const: tl_26m
             - const: peri_26m
             - const: top_133m
+  - if:
+      properties:
+        compatible:
+          const: airoha,en7581-pcie
+    then:
+      properties:
+        clock-names:
+          pattern: "^sys_ck[01]$"
 
 unevaluatedProperties: false
 
