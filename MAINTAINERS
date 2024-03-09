@@ -647,6 +647,13 @@ S:	Supported
 F:	fs/aio.c
 F:	include/linux/*aio*.h
 
+AIROHA PCIE PHY DRIVER
+M:	Lorenzo Bianconi <lorenzo@kernel.org>
+S:	Maintained
+L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+F:	documentation (FIXME)
+F:	drivers/phy/phy-airoha-pcie.c
+
 AIRSPY MEDIA DRIVER
 L:	linux-media@vger.kernel.org
 S:	Orphan
