@@ -99,6 +99,7 @@
 #define CSR_ANA2L_PXP_JCPLL_VCO_KBAND_MEAS_EN		BIT(24)
 
 #define REG_CSR_ANA2L_750M_SYS_CK			0x0054
+#define CSR_ANA2L_PXP_TXPLL_LPF_SHCK_EN			BIT(16)
 #define CSR_ANA2L_PXP_TXPLL_CHP_IBIAS			GENMASK(29, 24)
 
 #define REG_CSR_ANA2L_TXPLL_CHP_IOFST			0x0058
@@ -108,10 +109,23 @@
 #define CSR_ANA2L_PXP_TXPLL_LPF_BP			GENMASK(28, 24)
 
 #define REG_CSR_ANA2L_TXPLL_LPF_BWR			0x005c
+#define CSR_ANA2L_PXP_TXPLL_LPF_BWR			GENMASK(4, 0)
 #define CSR_ANA2L_PXP_TXPLL_LPF_BWC			GENMASK(12, 8)
+#define CSR_ANA2L_PXP_TXPLL_KBAND_CODE			GENMASK(31, 24)
+
+#define REG_CSR_ANA2L_TXPLL_KBAND_DIV			0x0060
+#define CSR_ANA2L_PXP_TXPLL_KBAND_DIV			GENMASK(2, 0)
+#define CSR_ANA2L_PXP_TXPLL_KBAND_KFC			GENMASK(9, 8)
+#define CSR_ANA2L_PXP_TXPLL_KBAND_KF			GENMASK(17, 16)
+#define CSR_ANA2L_PXP_txpll_KBAND_KS			GENMASK(25, 24)
 
 #define REG_CSR_ANA2L_TXPLL_POSTDIV			0x0064
+#define CSR_ANA2L_PXP_TXPLL_POSTDIV_EN			BIT(0)
 #define CSR_ANA2L_PXP_TXPLL_MMD_PREDIV_MODE		GENMASK(9, 8)
+#define CSR_ANA2L_PXP_TXPLL_PHY_CK1_EN			BIT(24)
+
+#define REG_CSR_ANA2L_TXPLL_PHY_CK2			0x0068
+#define CSR_ANA2L_PXP_TXPLL_REFIN_INTERNAL		BIT(24)
 
 #define REG_CSR_ANA2L_TXPLL_REFIN_DIV			0x006c
 #define CSR_ANA2L_PXP_TXPLL_REFIN_DIV			GENMASK(1, 0)
@@ -123,6 +137,14 @@
 #define CSR_ANA2L_PXP_TXPLL_SDM_IFM			BIT(8)
 #define CSR_ANA2L_PXP_TXPLL_SDM_ORD			GENMASK(25, 24)
 
+#define REG_CSR_ANA2L_TXPLL_SDM_OUT			0x0074
+#define CSR_ANA2L_PXP_TXPLL_TCL_AMP_EN			BIT(16)
+#define CSR_ANA2L_PXP_TXPLL_TCL_AMP_GAIN		GENMASK(26, 24)
+
+#define REG_CSR_ANA2L_TXPLL_TCL_AMP_VREF		0x0078
+#define CSR_ANA2L_PXP_TXPLL_TCL_AMP_VREF		GENMASK(4, 0)
+#define CSR_ANA2L_PXP_TXPLL_TCL_LPF_EN			BIT(24)
+
 #define REG_CSR_ANA2L_TXPLL_TCL_LPF_BW			0x007c
 #define CSR_ANA2L_PXP_TXPLL_TCL_LPF_BW			GENMASK(2, 0)
 #define CSR_ANA2L_PXP_TXPLL_VCO_CFIX			GENMASK(17, 16)
@@ -131,7 +153,8 @@
 #define REG_CSR_ANA2L_TXPLL_VCO_SCAPWR			0x0080
 #define CSR_ANA2L_PXP_TXPLL_VCO_SCAPWR			GENMASK(2, 0)
 
-#define REG_CSR_ANA2L_TXPLL_SSC_EN			0x0084
+#define REG_CSR_ANA2L_TXPLL_SSC				0x0084
+#define CSR_ANA2L_PXP_TXPLL_SSC_EN			BIT(0)
 #define CSR_ANA2L_PXP_TXPLL_SSC_PHASE_INI		BIT(8)
 
 #define REG_CSR_ANA2L_TXPLL_SSC_DELTA1			0x0088
@@ -141,10 +164,14 @@
 #define REG_CSR_ANA2L_TXPLL_SSC_PERIOD			0x008c
 #define CSR_ANA2L_PXP_txpll_SSC_PERIOD			GENMASK(15, 0)
 
+#define REG_CSR_ANA2L_TXPLL_VTP				0x0090
+#define CSR_ANA2L_PXP_TXPLL_VTP_EN			BIT(0)
+
 #define REG_CSR_ANA2L_TXPLL_TCL_VTP			0x0098
 #define CSR_ANA2L_PXP_TXPLL_SPARE_L			GENMASK(31, 24)
 
 #define REG_CSR_ANA2L_TXPLL_TCL_KBAND_VREF		0x009c
+#define CSR_ANA2L_PXP_TXPLL_TCL_KBAND_VREF		GENMASK(4, 0)
 #define CSR_ANA2L_PXP_TXPLL_VCO_KBAND_MEAS_EN		BIT(24)
 
 #define REG_CSR_ANA2L_TXPLL_POSTDIV_D256		0x00a0
@@ -1139,7 +1166,7 @@ static void airoha_pcie_phy_txpll(struct airoha_pcie_phy *pcie_phy)
 	airoha_phy_csr_ana2l_clear_bits(pcie_phy,
 					REG_CSR_ANA2L_TXPLL_SDM_DI_LS,
 					CSR_ANA2L_PXP_TXPLL_SDM_IFM);
-	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_SSC_EN,
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_SSC,
 					CSR_ANA2L_PXP_TXPLL_SSC_PHASE_INI);
 	airoha_phy_csr_ana2l_update_field(pcie_phy,
 					  REG_CSR_ANA2L_TXPLL_REFIN_DIV,
@@ -1195,77 +1222,56 @@ static void airoha_pcie_phy_txpll(struct airoha_pcie_phy *pcie_phy)
 				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_IDAC,
 				 PCIE_FORCE_SEL_DA_PXP_TXPLL_SDM_PCW);
 
- RG_PXP_2L_TXPLL_SSC_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SSC_EN);
- RG_PXP_2L_TXPLL_SSC_EN.hal.rg_pxp_2l_txpll_ssc_phase_ini = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SSC_EN, RG_PXP_2L_TXPLL_SSC_EN.dat.value);
-
- RG_PXP_2L_TXPLL_LPF_BWR.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_LPF_BWR);
- RG_PXP_2L_TXPLL_LPF_BWR.hal.rg_pxp_2l_txpll_lpf_bwr = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_LPF_BWR, RG_PXP_2L_TXPLL_LPF_BWR.dat.value);
-
- RG_PXP_2L_TXPLL_PHY_CK2_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_PHY_CK2_EN);
- RG_PXP_2L_TXPLL_PHY_CK2_EN.hal.rg_pxp_2l_txpll_refin_internal = 0x1; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_PHY_CK2_EN, RG_PXP_2L_TXPLL_PHY_CK2_EN.dat.value);
-
- RG_PXP_2L_TXPLL_TCL_KBAND_VREF.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_KBAND_VREF);
- RG_PXP_2L_TXPLL_TCL_KBAND_VREF.hal.rg_pxp_2l_txpll_vco_kband_meas_en = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_KBAND_VREF, RG_PXP_2L_TXPLL_TCL_KBAND_VREF.dat.value);
-
- RG_PXP_2L_TXPLL_VTP_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_VTP_EN);
- RG_PXP_2L_TXPLL_VTP_EN.hal.rg_pxp_2l_txpll_vtp_en = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_VTP_EN, RG_PXP_2L_TXPLL_VTP_EN.dat.value);
-
- RG_PXP_2L_TXPLL_POSTDIV_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_POSTDIV_EN);
- RG_PXP_2L_TXPLL_POSTDIV_EN.hal.rg_pxp_2l_txpll_phy_ck1_en = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_POSTDIV_EN, RG_PXP_2L_TXPLL_POSTDIV_EN.dat.value);
-
- RG_PXP_2L_TXPLL_PHY_CK2_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_PHY_CK2_EN);
- RG_PXP_2L_TXPLL_PHY_CK2_EN.hal.rg_pxp_2l_txpll_refin_internal = 0x1; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_PHY_CK2_EN, RG_PXP_2L_TXPLL_PHY_CK2_EN.dat.value);
-
- RG_PXP_2L_TXPLL_SSC_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SSC_EN);
- RG_PXP_2L_TXPLL_SSC_EN.hal.rg_pxp_2l_txpll_ssc_en = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SSC_EN, RG_PXP_2L_TXPLL_SSC_EN.dat.value);
-
- RG_PXP_2L_750M_SYS_CK_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_750M_SYS_CK_EN);
- RG_PXP_2L_750M_SYS_CK_EN.hal.rg_pxp_2l_txpll_lpf_shck_en = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_750M_SYS_CK_EN, RG_PXP_2L_750M_SYS_CK_EN.dat.value);
-
- RG_PXP_2L_TXPLL_POSTDIV_EN.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_POSTDIV_EN);
- RG_PXP_2L_TXPLL_POSTDIV_EN.hal.rg_pxp_2l_txpll_postdiv_en = 0x0; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_POSTDIV_EN, RG_PXP_2L_TXPLL_POSTDIV_EN.dat.value);
-
- RG_PXP_2L_TXPLL_KBAND_DIV.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_KBAND_DIV);
- RG_PXP_2L_TXPLL_KBAND_DIV.hal.rg_pxp_2l_txpll_kband_kfc = 0x0; 
- RG_PXP_2L_TXPLL_KBAND_DIV.hal.rg_pxp_2l_txpll_kband_kf = 0x3; 
- RG_PXP_2L_TXPLL_KBAND_DIV.hal.rg_pxp_2l_txpll_kband_ks = 0x1; 
- RG_PXP_2L_TXPLL_KBAND_DIV.hal.rg_pxp_2l_txpll_kband_div = 0x4; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_KBAND_DIV, RG_PXP_2L_TXPLL_KBAND_DIV.dat.value);
-
- RG_PXP_2L_TXPLL_LPF_BWR.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_LPF_BWR);
- RG_PXP_2L_TXPLL_LPF_BWR.hal.rg_pxp_2l_txpll_kband_code = 0xE4; 
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_LPF_BWR, RG_PXP_2L_TXPLL_LPF_BWR.dat.value);
-
- RG_PXP_2L_TXPLL_SDM_OUT.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SDM_OUT);
- RG_PXP_2L_TXPLL_SDM_OUT.hal.rg_pxp_2l_txpll_tcl_amp_en = 0x1; //Add for 7/6 mail: ??ana??for TCL, kaiwen pll BW setting
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SDM_OUT, RG_PXP_2L_TXPLL_SDM_OUT.dat.value);
-
- RG_PXP_2L_TXPLL_TCL_AMP_VREF.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_AMP_VREF);
- RG_PXP_2L_TXPLL_TCL_AMP_VREF.hal.rg_pxp_2l_txpll_tcl_lpf_en = 0x1; //TCL????????????, ????????
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_AMP_VREF, RG_PXP_2L_TXPLL_TCL_AMP_VREF.dat.value);
-
- RG_PXP_2L_TXPLL_TCL_KBAND_VREF.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_KBAND_VREF);
- RG_PXP_2L_TXPLL_TCL_KBAND_VREF.hal.rg_pxp_2l_txpll_tcl_kband_vref = 0xF; //Add for 7/6 mail: ??ana??, kaiwen pll BW setting
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_KBAND_VREF, RG_PXP_2L_TXPLL_TCL_KBAND_VREF.dat.value);
-
- RG_PXP_2L_TXPLL_SDM_OUT.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SDM_OUT);
- RG_PXP_2L_TXPLL_SDM_OUT.hal.rg_pxp_2l_txpll_tcl_amp_gain = 0x3; //Add for 7/6 mail: ??ana??, kaiwen pll BW setting
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_SDM_OUT, RG_PXP_2L_TXPLL_SDM_OUT.dat.value);
-
- RG_PXP_2L_TXPLL_TCL_AMP_VREF.dat.value = Reg_R(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_AMP_VREF);
- RG_PXP_2L_TXPLL_TCL_AMP_VREF.hal.rg_pxp_2l_txpll_tcl_amp_vref = 0xB; //Add for 7/6 mail: ??ana??, kaiwen pll BW setting
- Reg_W(pcie_phy, PCIE_ANA_2L, ANA_OFFSET, _RG_PXP_2L_TXPLL_TCL_AMP_VREF, RG_PXP_2L_TXPLL_TCL_AMP_VREF.dat.value);
-
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_SSC,
+					CSR_ANA2L_PXP_TXPLL_SSC_PHASE_INI);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_LPF_BWR,
+					CSR_ANA2L_PXP_TXPLL_LPF_BWR);
+	airoha_phy_csr_ana2l_set_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_PHY_CK2,
+				      CSR_ANA2L_PXP_TXPLL_REFIN_INTERNAL);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy,
+					REG_CSR_ANA2L_TXPLL_TCL_KBAND_VREF,
+					CSR_ANA2L_PXP_TXPLL_VCO_KBAND_MEAS_EN);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_VTP,
+					CSR_ANA2L_PXP_TXPLL_VTP_EN);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_POSTDIV,
+					CSR_ANA2L_PXP_TXPLL_PHY_CK1_EN);
+	airoha_phy_csr_ana2l_set_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_PHY_CK2,
+				      CSR_ANA2L_PXP_TXPLL_REFIN_INTERNAL);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_SSC,
+					CSR_ANA2L_PXP_TXPLL_SSC_EN);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_750M_SYS_CK,
+					CSR_ANA2L_PXP_TXPLL_LPF_SHCK_EN);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_POSTDIV,
+					CSR_ANA2L_PXP_TXPLL_POSTDIV_EN);
+	airoha_phy_csr_ana2l_clear_bits(pcie_phy,
+					REG_CSR_ANA2L_TXPLL_KBAND_DIV,
+					CSR_ANA2L_PXP_TXPLL_KBAND_KFC);
+	airoha_phy_csr_ana2l_update_field(pcie_phy,
+					  REG_CSR_ANA2L_TXPLL_KBAND_DIV,
+					  CSR_ANA2L_PXP_TXPLL_KBAND_KF, 0x3);
+	airoha_phy_csr_ana2l_update_field(pcie_phy,
+					  REG_CSR_ANA2L_TXPLL_KBAND_DIV,
+					  CSR_ANA2L_PXP_txpll_KBAND_KS, 0x1);
+	airoha_phy_csr_ana2l_update_field(pcie_phy,
+					  REG_CSR_ANA2L_TXPLL_KBAND_DIV,
+					  CSR_ANA2L_PXP_TXPLL_KBAND_DIV, 0x4);
+	airoha_phy_csr_ana2l_update_field(pcie_phy,
+					  REG_CSR_ANA2L_TXPLL_LPF_BWR,
+					  CSR_ANA2L_PXP_TXPLL_KBAND_CODE, 0xe4);
+	airoha_phy_csr_ana2l_set_bits(pcie_phy, REG_CSR_ANA2L_TXPLL_SDM_OUT,
+				      CSR_ANA2L_PXP_TXPLL_TCL_AMP_EN);
+	airoha_phy_csr_ana2l_set_bits(pcie_phy,
+				      REG_CSR_ANA2L_TXPLL_TCL_AMP_VREF,
+				      CSR_ANA2L_PXP_TXPLL_TCL_LPF_EN);
+	airoha_phy_csr_ana2l_update_field(pcie_phy,
+					  REG_CSR_ANA2L_TXPLL_TCL_KBAND_VREF,
+					  CSR_ANA2L_PXP_TXPLL_TCL_KBAND_VREF, 0xf);
+	airoha_phy_csr_ana2l_update_field(pcie_phy,
+					  REG_CSR_ANA2L_TXPLL_SDM_OUT,
+					  CSR_ANA2L_PXP_TXPLL_TCL_AMP_GAIN, 0x3);
+	airoha_phy_csr_ana2l_update_field(pcie_phy,
+					  REG_CSR_ANA2L_TXPLL_TCL_AMP_VREF,
+					  CSR_ANA2L_PXP_TXPLL_TCL_AMP_VREF, 0xb);
 	airoha_phy_csr_ana2l_update_field(pcie_phy,
 					  REG_CSR_ANA2L_TXPLL_TCL_LPF_BW,
 					  CSR_ANA2L_PXP_TXPLL_TCL_LPF_BW, 0x3);
