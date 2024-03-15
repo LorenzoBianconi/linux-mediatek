@@ -222,6 +222,9 @@
 #define REG_CSR_ANA2L_CDR0_LPF_RATIO			0x0110
 #define CSR_ANA2L_PXP_CDR0_LPF_TOP_LIM			GENMASK(26, 8)
 
+#define REG_CSR_ANA2L_CDR0_PR_INJ_MODE			0x011c
+#define CSR_ANA2L_PXP_CDR0_INJ_FORCE_OFF		BIT(24)
+
 #define REG_CSR_ANA2L_CDR0_PR_BETA_DAC			0x0120
 #define CSR_ANA2L_PXP_CDR0_PR_BETA_SEL			GENMASK(19, 16)
 #define CSR_ANA2L_PXP_CDR0_PR_KBAND_DIV			GENMASK(26, 24)
@@ -285,6 +288,9 @@
 #define REG_CSR_ANA2L_CDR1_LPF_RATIO			0x01c8
 #define CSR_ANA2L_PXP_CDR1_LPF_TOP_LIM			GENMASK(26, 8)
 
+#define REG_CSR_ANA2L_CDR1_PR_INJ_MODE			0x01d4
+#define CSR_ANA2L_PXP_CDR1_INJ_FORCE_OFF		BIT(24)
+
 #define REG_CSR_ANA2L_CDR1_PR_VREG_IBAND_VAL		0x01dc
 #define CSR_ANA2L_PXP_CDR1_PR_VREG_IBAND		GENMASK(2, 0)
 #define CSR_ANA2L_PXP_CDR1_PR_VREG_CKBUF		GENMASK(10, 8)
@@ -327,9 +333,21 @@
 #define REG_PCIE_PMA_CTRL_SEQUENCE_FORCE_CTRL1		0x0114
 #define PCIE_FORCE_RX_SDCAL_EN				BIT(0)
 
-#define REG_PCIE_PMA_SS_RX_FREQ_DET_2			0x0150
+#define REG_PCIE_PMA_SS_RX_FREQ_DET1			0x014c
+#define PCIE_PLL_FT_LOCK_CYCLECNT			GENMASK(15, 0)
+#define PCIE_PLL_FT_UNLOCK_CYCLECNT			GENMASK(31, 16)
+
+#define REG_PCIE_PMA_SS_RX_FREQ_DET2			0x0150
 #define PCIE_LOCK_TARGET_BEG				GENMASK(15, 0)
 #define PCIE_LOCK_TARGET_END				GENMASK(31, 16)
+
+#define REG_PCIE_PMA_SS_RX_FREQ_DET3			0x0154
+#define PCIE_UNLOCK_TARGET_BEG				GENMASK(15, 0)
+#define PCIE_UNLOCK_TARGET_END				GENMASK(31, 16)
+
+#define REG_PCIE_PMA_SS_RX_FREQ_DET4			0x0158
+#define PCIE_LOCK_LOCKTH				GENMASK(11, 8)
+#define PCIE_UNLOCK_LOCKTH				GENMASK(15, 12)
 
 #define REG_PCIE_PMA_SS_RX_CAL1				0x0160
 #define REG_PCIE_PMA_SS_RX_CAL2				0x0164
@@ -359,6 +377,7 @@
 #define PCIE_SW_XFI_RXPCS_RST				BIT(8)
 
 #define REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_IDAC		0x0794
+#define PCIE_FORCE_SEL_DA_PXP_CDR_PR_IDAC		BIT(16)
 #define PCIE_FORCE_SEL_DA_PXP_TXPLL_SDM_PCW		BIT(24)
 
 #define REG_PCIE_PMA_FORCE_DA_PXP_TXPLL_SDM_PCW		0x0798
@@ -373,6 +392,16 @@
 #define REG_PCIE_PMA_FORCE_DA_PXP_CDR_PD_PWDB		0x081c
 #define PCIE_FORCE_DA_PXP_CDR_PD_PWDB			BIT(0)
 #define PCIE_FORCE_SEL_DA_PXP_CDR_PD_PWDB		BIT(8)
+
+#define REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C		0x0820
+#define PCIE_FORCE_DA_PXP_CDR_PR_LPF_C_EN		BIT(0)
+#define PCIE_FORCE_SEL_DA_PXP_CDR_PR_LPF_C_EN		BIT(8)
+#define PCIE_FORCE_DA_PXP_CDR_PR_LPF_R_EN		BIT(16)
+#define PCIE_FORCE_SEL_DA_PXP_CDR_PR_LPF_R_EN		BIT(24)
+
+#define REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_PIEYE_PWDB	0x0824
+#define PCIE_FORCE_DA_PXP_CDR_PR_PWDB			BIT(16)
+#define PCIE_FORCE_SEL_DA_PXP_CDR_PR_PWDB		BIT(24)
 
 #define REG_PCIE_PMA_FORCE_PXP_JCPLL_CKOUT		0x0828
 #define PCIE_FORCE_DA_PXP_JCPLL_CKOUT_EN		BIT(0)
@@ -678,71 +707,77 @@ static void airoha_phy_update_bits(void __iomem *reg, u32 mask, u32 val)
 	airoha_phy_update_field((pcie_phy)->pma1 + (reg), (mask), (val))
 
 static void
-airoha_phy_init_lane0_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy, int gen)
+airoha_phy_init_lane0_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy,
+				      int gen)
 {
 	u32 fl_out_target = gen == 3 ? 41600 : 41941;
 	u32 lock_cyclecnt = gen == 3 ? 26000 : 32767;
-
-
 	int i;
-	int Thermometer_Search[7] = { 1, 2, 3, 4, 5, 6, 7 };
 
 	u32 pr_idac;
-	u32 RO_FL_Out_diff = 0; //20230301 for coverity , give init value 0
-	u32 RO_FL_Out_diff_tmp;
 	u32 tune_pr_idac_bit_position;
 	u32 RO_FL_Out = 0;
-	u32 RO_state_freqdet;
 	u32 cdr_pr_idac_tmp;
 
 	airoha_phy_pma0_set_bits(pcie_phy,
 				 REG_PCIE_PMA_SS_LCPLL_PWCTL_SETTING_1,
 				 PCIE_LCPLL_MAN_PWDB);
-	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET_2,
-				     PCIE_LOCK_TARGET_BEG, fl_out_target - 100);
-	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET_2,
-				     PCIE_LOCK_TARGET_END, fl_out_target + 100);
-	
-	Reg_R_then_W(pcie_phy, 0x1fa5b14C, lock_cyclecnt, 15, 0 );
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET2,
+				     PCIE_LOCK_TARGET_BEG,
+				     fl_out_target - 100);
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET2,
+				     PCIE_LOCK_TARGET_END,
+				     fl_out_target + 100);
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET1,
+				     PCIE_PLL_FT_LOCK_CYCLECNT, lock_cyclecnt);
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET4,
+				     PCIE_LOCK_LOCKTH, 0x3);
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET3,
+				     PCIE_UNLOCK_TARGET_BEG,
+				     fl_out_target - 100);
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET3,
+				     PCIE_UNLOCK_TARGET_END,
+				     fl_out_target + 100);
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET1,
+				     PCIE_PLL_FT_UNLOCK_CYCLECNT,
+				     lock_cyclecnt);
+	airoha_phy_pma0_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET4,
+				     PCIE_UNLOCK_LOCKTH, 0x3);
 
-	Reg_R_then_W(pcie_phy, 0x1fa5b158, 3, 11, 8 );
+	airoha_phy_csr_ana2l_set_bits(pcie_phy, REG_CSR_ANA2L_CDR0_PR_INJ_MODE,
+				      CSR_ANA2L_PXP_CDR0_INJ_FORCE_OFF);
 
-	Reg_R_then_W(pcie_phy, 0x1fa5b154, fl_out_target - 100, 15, 0 );
+	airoha_phy_pma0_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_LPF_R_EN);
+	airoha_phy_pma0_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				 PCIE_FORCE_DA_PXP_CDR_PR_LPF_R_EN);
+	airoha_phy_pma0_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_LPF_C_EN);
+	airoha_phy_pma0_clear_bits(pcie_phy,
+				   REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				   PCIE_FORCE_DA_PXP_CDR_PR_LPF_C_EN);
+	airoha_phy_pma0_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_IDAC,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_IDAC);
 
-	Reg_R_then_W(pcie_phy, 0x1fa5b154, fl_out_target + 100, 31, 16 );
+	airoha_phy_pma0_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_PIEYE_PWDB,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_PWDB);
+	airoha_phy_pma0_clear_bits(pcie_phy,
+				   REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_PIEYE_PWDB,
+				   PCIE_FORCE_DA_PXP_CDR_PR_PWDB);
+	airoha_phy_pma0_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_PIEYE_PWDB,
+				 PCIE_FORCE_DA_PXP_CDR_PR_PWDB);
 
-	Reg_R_then_W(pcie_phy, 0x1fa5b14C, lock_cyclecnt, 31, 16 );
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b158, 3, 15, 12 );
-
-		Reg_R_then_W(pcie_phy, 0x1fa5a11c, 1, 24, 24 ); //RG_PXP_CDR_PR_INJ_FORCE_OFF = 1
-
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b820, 1, 24, 24 ); //rg_force_sel_da_pxp_cdr_pr_lpf_r_en = 1
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b820, 1, 16, 16 ); //rg_force_da_pxp_cdr_pr_lpf_r_en = 1
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b820, 1, 8, 8 ); //rg_force_sel_da_pxp_cdr_pr_lpf_c_en = 1
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b820, 0, 0, 0 ); //rg_force_da_pxp_cdr_pr_lpf_c_en = 0
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b794, 1, 16, 16 ); //rg_force_sel_da_pxp_cdr_pr_idac = 1
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b824, 1, 24, 24 ); //rg_force_sel_da_pxp_cdr_pr_pwdb = 1
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b824, 0, 16, 16 ); //rg_force_da_pxp_cdr_pr_pwdb=1'b0 --> 1'b1 (PR Reset) = 0
-
-	Reg_R_then_W(pcie_phy, 0x1fa5b824, 1, 16, 16 ); //rg_force_da_pxp_cdr_pr_pwdb=1'b0 --> 1'b1 (PR Reset) = 1
-	
-	RO_FL_Out_diff_tmp = 0xffff;
 	cdr_pr_idac_tmp = 0;
 
 	for (i = 0; i < 7; i++)
 	{
-
-	    pr_idac = Thermometer_Search[i];
-	    
-	    Reg_R_then_W(pcie_phy, 0x1fa5b794, Thermometer_Search[i] << 8, 10, 0 ); //rg_force_da_pxp_cdr_pr_idac[10:0]
+	    Reg_R_then_W(pcie_phy, 0x1fa5b794, i << 8, 10, 0 ); //rg_force_da_pxp_cdr_pr_idac[10:0]
 
 	    Reg_R_then_W(pcie_phy, 0x1fa5b158, 0, 2, 0 ); //rg_freqlock_det_en=3'h3 = 0
 
@@ -756,10 +791,9 @@ airoha_phy_init_lane0_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy, int gen)
 	    RO_FL_Out = (Reg_R(pcie_phy, 0x1fa5b000, 0, 0x530) >> 16) & 0xffff;
 
 		
-	    if ((RO_FL_Out > fl_out_target) /*&& (RO_FL_Out_diff < RO_FL_Out_diff_tmp)*/)
+	    if (RO_FL_Out > fl_out_target)
 	    {
-	        RO_FL_Out_diff_tmp = RO_FL_Out_diff;
-	        cdr_pr_idac_tmp = Thermometer_Search[i] << 8;
+	        cdr_pr_idac_tmp = i << 8;
 	    }
 	}
 
@@ -804,8 +838,7 @@ airoha_phy_init_lane0_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy, int gen)
 
 	    RO_FL_Out = (Reg_R(pcie_phy, 0x1fa5b000, 0, 0x530) >> 16) & 0xffff;
 
-	    // Read BG, RO_state_freqdet
-	    RO_state_freqdet = Reg_R(pcie_phy, 0x1fa5b000, 0, 0x530) & 0x1;
+	    //RO_state_freqdet = Reg_R(pcie_phy, 0x1fa5b000, 0, 0x530) & 0x1;
 	}
 	
 	//turn off force mode, and write load band value
@@ -838,16 +871,11 @@ airoha_phy_init_lane1_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy,
 {
 	u32 fl_out_target = gen == 3 ? 41600 : 41941;
 	u32 lock_cyclecnt = gen == 3 ? 26000 : 32767;
-
 	int i;
-	int Thermometer_Search[7] = { 1, 2, 3, 4, 5, 6, 7 };
 
 	u32 pr_idac;
-	u32 RO_FL_Out_diff = 0; //20230301 for coverity , give init value 0
-	u32 RO_FL_Out_diff_tmp;
 	u32 tune_pr_idac_bit_position;
 	u32 RO_FL_Out = 0;
-	u32 RO_state_freqdet;
 	u32 cdr_pr_idac_tmp;
 
 	u32 lane_offset_dig;
@@ -857,51 +885,61 @@ airoha_phy_init_lane1_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy,
 	airoha_phy_pma1_set_bits(pcie_phy,
 				 REG_PCIE_PMA_SS_LCPLL_PWCTL_SETTING_1,
 				 PCIE_LCPLL_MAN_PWDB);
-	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET_2,
-				     PCIE_LOCK_TARGET_BEG, fl_out_target - 100);
-	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET_2,
-				     PCIE_LOCK_TARGET_END, fl_out_target + 100);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET2,
+				     PCIE_LOCK_TARGET_BEG,
+				     fl_out_target - 100);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET2,
+				     PCIE_LOCK_TARGET_END,
+				     fl_out_target + 100);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET1,
+				     PCIE_PLL_FT_LOCK_CYCLECNT, lock_cyclecnt);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET4,
+				     PCIE_LOCK_LOCKTH, 0x3);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET3,
+				     PCIE_UNLOCK_TARGET_BEG,
+				     fl_out_target - 100);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET3,
+				     PCIE_UNLOCK_TARGET_END,
+				     fl_out_target + 100);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET1,
+				     PCIE_PLL_FT_UNLOCK_CYCLECNT,
+				     lock_cyclecnt);
+	airoha_phy_pma1_update_field(pcie_phy, REG_PCIE_PMA_SS_RX_FREQ_DET4,
+				     PCIE_UNLOCK_LOCKTH, 0x3);
 	
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b14C, lock_cyclecnt, 15, 0 );
+	airoha_phy_csr_ana2l_set_bits(pcie_phy, REG_CSR_ANA2L_CDR1_PR_INJ_MODE,
+				      CSR_ANA2L_PXP_CDR1_INJ_FORCE_OFF);
 
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b158, 3, 11, 8 );
+	airoha_phy_pma1_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_LPF_R_EN);
+	airoha_phy_pma1_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				 PCIE_FORCE_DA_PXP_CDR_PR_LPF_R_EN);
+	airoha_phy_pma1_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_LPF_C_EN);
+	airoha_phy_pma1_clear_bits(pcie_phy,
+				   REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_LPF_C,
+				   PCIE_FORCE_DA_PXP_CDR_PR_LPF_C_EN);
+	airoha_phy_pma1_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_IDAC,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_IDAC);
+	airoha_phy_pma1_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_PIEYE_PWDB,
+				 PCIE_FORCE_SEL_DA_PXP_CDR_PR_PWDB);
+	airoha_phy_pma1_clear_bits(pcie_phy,
+				   REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_PIEYE_PWDB,
+				   PCIE_FORCE_DA_PXP_CDR_PR_PWDB);
+	airoha_phy_pma1_set_bits(pcie_phy,
+				 REG_PCIE_PMA_FORCE_DA_PXP_CDR_PR_PIEYE_PWDB,
+				 PCIE_FORCE_DA_PXP_CDR_PR_PWDB);
 
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b154, fl_out_target - 100, 15, 0 );
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b154, fl_out_target + 100, 31, 16 ); 
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b14C, lock_cyclecnt, 31, 16 );
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b158, 3, 15, 12 );
-
-		Reg_R_then_W(pcie_phy, 0x1fa5a1d4, 1, 24, 24 ); //RG_PXP_CDR_PR_INJ_FORCE_OFF = 1
-
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b820, 1, 24, 24 ); //rg_force_sel_da_pxp_cdr_pr_lpf_r_en = 1
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b820, 1, 16, 16 ); //rg_force_da_pxp_cdr_pr_lpf_r_en = 1
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b820, 1, 8, 8 ); //rg_force_sel_da_pxp_cdr_pr_lpf_c_en = 1
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b820, 0, 0, 0 ); //rg_force_da_pxp_cdr_pr_lpf_c_en = 0
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b794, 1, 16, 16 ); //rg_force_sel_da_pxp_cdr_pr_idac = 1
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b824, 1, 24, 24 ); //rg_force_sel_da_pxp_cdr_pr_pwdb = 1
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b824, 0, 16, 16 ); //rg_force_da_pxp_cdr_pr_pwdb=1'b0 --> 1'b1 (PR Reset) = 0
-
-	Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b824, 1, 16, 16 ); //rg_force_da_pxp_cdr_pr_pwdb=1'b0 --> 1'b1 (PR Reset) = 1
-	
-	RO_FL_Out_diff_tmp = 0xffff;
 	cdr_pr_idac_tmp = 0;
 
 	for (i = 0; i < 7; i++)
 	{
-
-	    pr_idac = Thermometer_Search[i];
-	    
-	    Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b794, Thermometer_Search[i] << 8, 10, 0 ); //rg_force_da_pxp_cdr_pr_idac[10:0]
+	    Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b794, i << 8, 10, 0 ); //rg_force_da_pxp_cdr_pr_idac[10:0]
 
 	    Reg_R_then_W(pcie_phy, lane_offset_dig + 0x1fa5b158, 0, 2, 0 ); //rg_freqlock_det_en=3'h3 = 0
 
@@ -915,10 +953,9 @@ airoha_phy_init_lane1_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy,
 	    RO_FL_Out = (Reg_R(pcie_phy, lane_offset_dig + 0x1fa5b000, 0, 0x530) >> 16) & 0xffff;
 
 		
-	    if ((RO_FL_Out > fl_out_target) /*&& (RO_FL_Out_diff < RO_FL_Out_diff_tmp)*/)
+	    if (RO_FL_Out > fl_out_target)
 	    {
-	        RO_FL_Out_diff_tmp = RO_FL_Out_diff;
-	        cdr_pr_idac_tmp = Thermometer_Search[i] << 8;
+	        cdr_pr_idac_tmp = i << 8;
 	    }
 	}
 
@@ -963,8 +1000,7 @@ airoha_phy_init_lane1_rx_fw_pre_calib(struct airoha_pcie_phy *pcie_phy,
 
 	    RO_FL_Out = (Reg_R(pcie_phy, lane_offset_dig + 0x1fa5b000, 0, 0x530) >> 16) & 0xffff;
 
-	    // Read BG, RO_state_freqdet
-	    RO_state_freqdet = Reg_R(pcie_phy, lane_offset_dig + 0x1fa5b000, 0, 0x530) & 0x1;
+	    //RO_state_freqdet = Reg_R(pcie_phy, lane_offset_dig + 0x1fa5b000, 0, 0x530) & 0x1;
 	}
 	
 	//turn off force mode, and write load band value
