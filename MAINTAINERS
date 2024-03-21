@@ -655,6 +655,14 @@ F:	Documentation/devicetree/bindings/phy/airoha,pcie-phy.yaml
 F:	drivers/phy/phy-airoha-pcie.c
 F:	drivers/phy/phy-airoha-pcie-regs.h
 
+AIROHA SPI DRIVER
+M:	Lorenzo Bianconi <lorenzo@kernel.org>
+S:	Maintained
+L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+L:	linux-spi@vger.kernel.org
+F:	Documentation/devicetree/bindings/phy/airoha,pcie-phy.yaml (FIXME)
+F:	drivers/spi/spi-airoha.c
+
 AIRSPY MEDIA DRIVER
 L:	linux-media@vger.kernel.org
 S:	Orphan

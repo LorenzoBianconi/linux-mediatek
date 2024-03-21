@@ -57,6 +57,14 @@ config SPI_MEM
 
 comment "SPI Master Controller Drivers"
 
+config SPI_AIROHA
+	tristate "Airoha SPI EN7581 controller"
+	depends on ARCH_AIROHA || COMPILE_TEST
+	depends on SPI_MASTER
+	depends on OF
+	help
+	  This selects the Airoha EN7581 SPI controller driver.
+
 config SPI_ALTERA
 	tristate "Altera SPI Controller platform driver"
 	select SPI_ALTERA_CORE
