@@ -657,6 +657,7 @@ F:	drivers/phy/phy-airoha-pcie-regs.h
 
 AIROHA SPI DRIVER
 M:	Lorenzo Bianconi <lorenzo@kernel.org>
+M:	Ray Liu <ray.liu@airoha.com>
 S:	Maintained
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 L:	linux-spi@vger.kernel.org
