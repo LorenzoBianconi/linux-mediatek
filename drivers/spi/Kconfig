@@ -61,7 +61,7 @@ config SPI_AIROHA
 	tristate "Airoha SPI EN7581 controller"
 	depends on ARCH_AIROHA || COMPILE_TEST
 	depends on SPI_MASTER
-	depends on OF
+	select REGMAP_MMIO
 	help
 	  This selects the Airoha EN7581 SPI controller driver.
 
