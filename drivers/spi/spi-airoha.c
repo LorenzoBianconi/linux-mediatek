@@ -249,7 +249,7 @@ static int airoha_spi_set_fifo_op(struct airoha_snand *as, u8 op_cmd,
 	err = regmap_read_poll_timeout(as->regmap_ctrl,
 				       REG_SPI_CTRL_OPFIFO_FULL,
 				       val, !(val & SPI_CTRL_OPFIFO_FULL),
-				       USEC_PER_MSEC, 250 * USEC_PER_MSEC);
+				       0, 250 * USEC_PER_MSEC);
 	if (err)
 		return err;
 
@@ -261,7 +261,7 @@ static int airoha_spi_set_fifo_op(struct airoha_snand *as, u8 op_cmd,
 	return regmap_read_poll_timeout(as->regmap_ctrl,
 					REG_SPI_CTRL_OPFIFO_EMPTY,
 					val, (val & SPI_CTRL_OPFIFO_EMPTY),
-					USEC_PER_MSEC, 250 * USEC_PER_MSEC);
+					0, 250 * USEC_PER_MSEC);
 }
 
 static int airoha_spi_set_cs(struct airoha_snand *as, SPI_CONTROLLER_CHIP_SELECT_T cs)
@@ -282,8 +282,7 @@ static int airoha_spi_write_data_to_fifo(struct airoha_snand *as,
 		err = regmap_read_poll_timeout(as->regmap_ctrl,
 					       REG_SPI_CTRL_DFIFO_FULL, val,
 					       !(val & SPI_CTRL_DFIFO_FULL),
-					       USEC_PER_MSEC,
-					       250 * USEC_PER_MSEC);
+					       0, 250 * USEC_PER_MSEC);
 		if (err)
 			return err;
 
@@ -297,8 +296,7 @@ static int airoha_spi_write_data_to_fifo(struct airoha_snand *as,
 		err = regmap_read_poll_timeout(as->regmap_ctrl,
 					       REG_SPI_CTRL_DFIFO_FULL, val,
 					       !(val & SPI_CTRL_DFIFO_FULL),
-					       USEC_PER_MSEC,
-					       250 * USEC_PER_MSEC);
+					       0, 250 * USEC_PER_MSEC);
 		if (err)
 			return err;
 	}
@@ -319,8 +317,7 @@ static int airoha_spi_read_data_from_fifo(struct airoha_snand *as, u8 *ptr,
 		err = regmap_read_poll_timeout(as->regmap_ctrl,
 					       REG_SPI_CTRL_DFIFO_EMPTY, val,
 					       !(val & SPI_CTRL_DFIFO_EMPTY),
-					       USEC_PER_MSEC,
-					       250 * USEC_PER_MSEC);
+					       0, 250 * USEC_PER_MSEC);
 		if (err)
 			return err;
 
@@ -363,8 +360,7 @@ static int airoha_spi_set_mode(struct airoha_snand *as,
 		err = regmap_read_poll_timeout(as->regmap_ctrl,
 					       REG_SPI_CTRL_RDCTL_FSM, val,
 					       !(val & SPI_CTRL_RDCTL_FSM),
-					       USEC_PER_MSEC,
-					       250 * USEC_PER_MSEC);
+					       0, 250 * USEC_PER_MSEC);
 		if (err)
 			return err;
 
