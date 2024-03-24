@@ -215,13 +215,9 @@ struct airoha_spi_dev {
 };
 
 struct airoha_snand {
-    struct spi_controller *master;
-    struct device *dev;
+	struct device *dev;
 	struct regmap *regmap_ctrl;
 	struct regmap *regmap_nfi;
-    void __iomem *spi_base;
-    void __iomem *nfi_base;
-    int irq;
 
 	struct {
 		size_t page_size;
@@ -232,7 +228,6 @@ struct airoha_snand {
 
     unsigned long current_page_num;
     bool data_need_update;
-    bool autofmt; // <-- soc controller ecc need to implement this feature
 };
 
 static int airoha_spi_set_fifo_op(struct airoha_snand *as, u8 op_cmd,
@@ -598,9 +593,6 @@ static int airoha_spi_adjust_op_size(struct spi_mem *mem,
 	size_t len;
 
 	if (airoha_spi_is_page_ops(op)) {
-		if (as->autofmt)
-			return 0;
-
 		len = as->nfi_cfg.sec_size + as->nfi_cfg.spare_size;
 		len *= as->nfi_cfg.sec_num;
 		op->data.nbytes = min(op->data.nbytes, len);
@@ -1053,7 +1045,6 @@ static int airoha_spi_nfi_setup(struct airoha_snand *as)
 	sec_size = FIELD_GET(SPI_NFI_CUS_SEC_SIZE, val);
 
 	/* init default value */
-	as->autofmt = false;
 	as->nfi_cfg.sec_size = sec_size;
 	as->nfi_cfg.sec_num = sec_num;
 	as->nfi_cfg.page_size = rounddown(sec_size * sec_num, 1024);
@@ -1092,113 +1083,60 @@ MODULE_DEVICE_TABLE(of, airoha_spi_ids);
 
 static int airoha_spi_probe(struct platform_device *pdev)
 {
-    struct resource *spi_res = NULL;
-    struct resource *nfi_res = NULL;
-    struct spi_controller *master;
-    struct airoha_snand *as;
-    int err;
+	struct spi_controller *ctrl;
+	struct airoha_snand *as;
+	struct resource *res;
+	void __iomem *base;
+	int err;
 
-    printk("NAND device found\n");
+	ctrl = devm_spi_alloc_host(&pdev->dev, sizeof(*as));
+	if (!ctrl)
+		return -ENOMEM;
 
-    /* linux kernel platform */
-    master = spi_alloc_master(&pdev->dev, sizeof(*as));
-    if(!master)
-    {
-        return -ENOMEM;
-    }
-    platform_set_drvdata(pdev, master);
+	as = spi_master_get_devdata(ctrl);
+	as->dev = &pdev->dev;
 
-    /* spi platform */
-    as = spi_master_get_devdata(master);
-    as->master = master;
-    as->dev = &pdev->dev;
-    // ECC part tbd
-    spi_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-    if(!spi_res)
-    {
-        err = -ENODEV;
-        goto err_put_controller;
-    }
-    as->spi_base = devm_ioremap_resource(&pdev->dev, spi_res);
-    if(IS_ERR(as->spi_base))
-    {
-        err = PTR_ERR(as->spi_base);
-        goto err_put_controller;
-    }
+	base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
+	if (IS_ERR(base))
+		return PTR_ERR(base);
 
-	as->regmap_ctrl = devm_regmap_init_mmio(&pdev->dev, as->spi_base,
+	as->regmap_ctrl = devm_regmap_init_mmio(&pdev->dev, base,
 						&spi_ctrl_regmap_config);
 	if (IS_ERR(as->regmap_ctrl)) {
 		 dev_err(&pdev->dev, "failed to init spi ctrl regmap: %ld\n",
 			 PTR_ERR(as->regmap_ctrl));
-		 err = PTR_ERR(as->regmap_ctrl);
-		 goto err_put_controller;
+		 return PTR_ERR(as->regmap_ctrl);
 	}
 
-    nfi_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-    if(!nfi_res)
-    {
-        err = -ENODEV;
-        goto err_put_controller;
-    }
-    as->nfi_base = devm_ioremap_resource(&pdev->dev, nfi_res);
-    if(IS_ERR(as->nfi_base))
-    {
-        err = PTR_ERR(as->nfi_base);
-        goto err_put_controller;
-    }
+	base = devm_platform_get_and_ioremap_resource(pdev, 1, &res);
+	if (IS_ERR(base))
+		return PTR_ERR(base);
 
-	as->regmap_nfi = devm_regmap_init_mmio(&pdev->dev, as->nfi_base,
+	as->regmap_nfi = devm_regmap_init_mmio(&pdev->dev, base,
 						&spi_nfi_regmap_config);
 	if (IS_ERR(as->regmap_nfi)) {
 		 dev_err(&pdev->dev, "failed to init spi nfi regmap: %ld\n",
 			 PTR_ERR(as->regmap_nfi));
-		 err = PTR_ERR(as->regmap_nfi);
-		 goto err_put_controller;
+		 return PTR_ERR(as->regmap_nfi);
 	}
 
-    as->irq = platform_get_irq(pdev, 0);
-    if(as->irq < 0)
-    {
-        err = as->irq;
-        goto err_put_controller;
-    }
-    err = dma_set_mask(as->dev, DMA_BIT_MASK(32));
-    if(err)
-    {
-        goto err_put_controller;
-    }
+	err = dma_set_mask(as->dev, DMA_BIT_MASK(32));
+	if (err)
+		return err;
 
-    /* Hook function pointer and settings to kernel */
-    master->num_chipselect = 2;
-    master->mem_ops = &airoha_spi_mem_ops;
-    master->bits_per_word_mask = SPI_BPW_MASK(8);
-    master->mode_bits = SPI_RX_DUAL;
-    master->dev.of_node = pdev->dev.of_node;
-    master->setup = airoha_spi_setup;
-    master->cleanup = airoha_spi_cleanup;
+	ctrl->num_chipselect = 2;
+	ctrl->mem_ops = &airoha_spi_mem_ops;
+	ctrl->bits_per_word_mask = SPI_BPW_MASK(8);
+	ctrl->mode_bits = SPI_RX_DUAL;
+	ctrl->dev.of_node = pdev->dev.of_node;
+	ctrl->setup = airoha_spi_setup;
+	ctrl->cleanup = airoha_spi_cleanup;
 
 	err = airoha_spi_nfi_setup(as);
 	if (err)
 		return err;
 
-    err = spi_register_master(master);
-
-    if(err)
-    {
-        goto err_put_controller;
-    }
-
-
-	printk("trying to init new device\n"); 
-
-	printk("spi_device initailized\n"); 
-
-    return 0;
-
-err_put_controller:
-    spi_master_put(master);
-    return err;
+	return devm_spi_register_controller(&pdev->dev, ctrl);
 }
 
 static struct platform_driver airoha_spi_driver = {
