@@ -661,7 +661,7 @@ M:	Ray Liu <ray.liu@airoha.com>
 S:	Maintained
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 L:	linux-spi@vger.kernel.org
-F:	Documentation/devicetree/bindings/phy/airoha,pcie-phy.yaml (FIXME)
+F:	Documentation/devicetree/bindings/spi/airoha,spi-airoha-snfi.yaml
 F:	drivers/spi/spi-airoha.c
 
 AIRSPY MEDIA DRIVER
