@@ -212,6 +212,9 @@ struct airoha_spi_dev {
 	dma_addr_t tx_dma_addr;
 	u8 *rx_buf;
 	dma_addr_t rx_dma_addr;
+
+	bool data_need_update;
+	unsigned long current_page_num;
 };
 
 struct airoha_spi_ctrl {
@@ -225,9 +228,6 @@ struct airoha_spi_ctrl {
 		unsigned char sec_num;
 		unsigned char spare_size;
 	} nfi_cfg;
-
-    unsigned long current_page_num;
-    bool data_need_update;
 };
 
 static int airoha_spi_set_fifo_op(struct airoha_spi_ctrl *aspi_ctrl, u8 op_cmd,
@@ -657,11 +657,10 @@ static ssize_t airoha_spi_dirmap_read(struct spi_mem_dirmap_desc *desc,
 	u32 val, rd_mode;
 	int err;
 
-	aspi_ctrl = spi_master_get_devdata(spi->master);
-	if (!aspi_ctrl->data_need_update)
+	if (!aspi_dev->data_need_update)
 		return len;
 
-	aspi_ctrl->data_need_update = false;
+	aspi_dev->data_need_update = false;
 
 	switch (op->cmd.opcode) {
 	case SPI_NAND_OP_READ_FROM_CACHE_DUAL:
@@ -675,6 +674,7 @@ static ssize_t airoha_spi_dirmap_read(struct spi_mem_dirmap_desc *desc,
 		break;
 	}
 
+	aspi_ctrl = spi_master_get_devdata(spi->master);
 	err = airoha_spi_set_mode(aspi_ctrl, SPI_MODE_DMA);
 	if (err < 0)
 		return err;
@@ -900,21 +900,22 @@ static ssize_t airoha_spi_dirmap_write(struct spi_mem_dirmap_desc *desc,
 
 static int airoha_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 {
+	struct airoha_spi_dev *aspi_dev = spi_get_ctldata(mem->spi);
 	struct airoha_spi_ctrl *aspi_ctrl;
 	u8 data, opcode = op->cmd.opcode;
 	int i, err;
 
 	aspi_ctrl = spi_master_get_devdata(mem->spi->master);
 	if (opcode == SPI_NAND_OP_PROGRAM_EXECUTE &&
-	    op->addr.val == aspi_ctrl->current_page_num) {
-		aspi_ctrl->data_need_update = true;
+	    op->addr.val == aspi_dev->current_page_num) {
+		aspi_dev->data_need_update = true;
 	} else if (opcode == SPI_NAND_OP_PAGE_READ) {
-		if (!aspi_ctrl->data_need_update &&
-		    op->addr.val == aspi_ctrl->current_page_num)
+		if (!aspi_dev->data_need_update &&
+		    op->addr.val == aspi_dev->current_page_num)
 			return 0;
 
-		aspi_ctrl->data_need_update = true;
-		aspi_ctrl->current_page_num = op->addr.val;
+		aspi_dev->data_need_update = true;
+		aspi_dev->current_page_num = op->addr.val;
 	}
 	
 	/* switch to manual mode */
@@ -988,6 +989,7 @@ static int airoha_spi_setup(struct spi_device *spi)
 		return -ENOMEM;
 
 	spi_set_ctldata(spi, aspi_dev);
+	aspi_dev->data_need_update = true;
 
 	/* prepare device buffer */
 	aspi_dev->buf_len = SPI_NAND_CACHE_SIZE;
@@ -1069,8 +1071,6 @@ static int airoha_spi_nfi_setup(struct airoha_spi_ctrl *aspi_ctrl)
 	aspi_ctrl->nfi_cfg.sec_num = sec_num;
 	aspi_ctrl->nfi_cfg.page_size = rounddown(sec_size * sec_num, 1024);
 	aspi_ctrl->nfi_cfg.spare_size = 16;
-	aspi_ctrl->current_page_num = 0;
-	aspi_ctrl->data_need_update = true;
 
 	err = airoha_spi_nfi_init(aspi_ctrl);
 	if (err)
