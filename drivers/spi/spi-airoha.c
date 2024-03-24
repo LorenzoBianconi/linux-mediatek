@@ -214,7 +214,7 @@ struct airoha_spi_dev {
 	dma_addr_t rx_dma_addr;
 
 	bool data_need_update;
-	u64 current_page_num;
+	u64 cur_page_num;
 };
 
 struct airoha_spi_ctrl {
@@ -907,15 +907,15 @@ static int airoha_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 
 	aspi_ctrl = spi_master_get_devdata(mem->spi->master);
 	if (opcode == SPI_NAND_OP_PROGRAM_EXECUTE &&
-	    op->addr.val == aspi_dev->current_page_num) {
+	    op->addr.val == aspi_dev->cur_page_num) {
 		aspi_dev->data_need_update = true;
 	} else if (opcode == SPI_NAND_OP_PAGE_READ) {
 		if (!aspi_dev->data_need_update &&
-		    op->addr.val == aspi_dev->current_page_num)
+		    op->addr.val == aspi_dev->cur_page_num)
 			return 0;
 
 		aspi_dev->data_need_update = true;
-		aspi_dev->current_page_num = op->addr.val;
+		aspi_dev->cur_page_num = op->addr.val;
 	}
 	
 	/* switch to manual mode */
