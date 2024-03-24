@@ -655,7 +655,7 @@ F:	Documentation/devicetree/bindings/phy/airoha,pcie-phy.yaml
 F:	drivers/phy/phy-airoha-pcie.c
 F:	drivers/phy/phy-airoha-pcie-regs.h
 
-AIROHA SPI DRIVER
+AIROHA SPI SNFI DRIVER
 M:	Lorenzo Bianconi <lorenzo@kernel.org>
 M:	Ray Liu <ray.liu@airoha.com>
 S:	Maintained

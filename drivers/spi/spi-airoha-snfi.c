@@ -1072,7 +1072,7 @@ static const struct regmap_config spi_nfi_regmap_config = {
 };
 
 static const struct of_device_id airoha_spi_ids[] = {
-    { .compatible = "airoha,en7581-spi" },
+    { .compatible = "airoha,en7581-snand" },
     { }
 };
 MODULE_DEVICE_TABLE(of, airoha_spi_ids);
