@@ -214,7 +214,7 @@ struct airoha_spi_dev {
 	dma_addr_t rx_dma_addr;
 
 	bool data_need_update;
-	unsigned long current_page_num;
+	u64 current_page_num;
 };
 
 struct airoha_spi_ctrl {
