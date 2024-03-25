@@ -181,6 +181,26 @@
 			};
 		};
 
+		gpio0: gpio@1fbf0200 {
+			compatible = "airoha,en7523-gpio";
+			reg = <0 0x1fbf0204 0 0x4>,
+			      <0 0x1fbf0200 0 0x4>,
+			      <0 0x1fbf0220 0 0x4>,
+			      <0 0x1fbf0214 0 0x4>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
+		gpio1: gpio@1fbf0270 {
+			compatible = "airoha,en7523-gpio";
+			reg = <0 0x1fbf0270 0 0x4>,
+			      <0 0x1fbf0260 0 0x4>,
+			      <0 0x1fbf0264 0 0x4>,
+			      <0 0x1fbf0278 0 0x4>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
 		pciephy: phy@1fa5a000 {
 			compatible = "airoha,en7581-pcie-phy";
 			reg = <0x0 0x1fa5a000 0x0 0xfff>,
@@ -288,7 +308,7 @@
 		};
 
 		switch: switch@1fb58000 {
-			compatible = "mediatek,mt7988-switch";
+			compatible = "airoha,en7581-switch";
 			reg = <0 0x1fb58000 0 0x8000>;
 			resets = <&scuclk EN7581_GSW_RST>;
 
