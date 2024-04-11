@@ -101,6 +101,17 @@
 #define PCIE_ATR_TLP_TYPE_MEM		PCIE_ATR_TLP_TYPE(0)
 #define PCIE_ATR_TLP_TYPE_IO		PCIE_ATR_TLP_TYPE(2)
 
+struct mtk_gen3_pcie;
+struct mtk_pcie_port;
+
+/**
+ * struct mtk_pcie_soc - differentiate between host generations
+ * @power_up: pcie power_up callback
+ */
+struct mtk_pcie_soc {
+	int (*power_up)(struct mtk_pcie_port *port);
+};
+
 /**
  * struct mtk_msi_set - MSI information for each set
  * @base: IO mapped register base
@@ -156,6 +167,7 @@ struct mtk_pcie_port {
  * @phy: PHY controller block
  * @clks: PCIe clocks
  * @num_clks: PCIe clocks count for this port
+ * @soc: pointer to SoC-dependent operations
  */
 struct mtk_gen3_pcie {
 	struct list_head ports;
@@ -166,6 +178,7 @@ struct mtk_gen3_pcie {
 	struct phy *phy;
 	struct clk_bulk_data *clks;
 	int num_clks;
+	const struct mtk_pcie_soc *soc;
 };
 
 /* LTSSM state in PCIE_LTSSM_STATUS_REG bit[28:24] */
@@ -960,8 +973,9 @@ static int mtk_pcie_get_resources(struct mtk_gen3_pcie *pcie)
 	return 0;
 }
 
-static int mtk_pcie_power_up(struct mtk_gen3_pcie *pcie)
+static int mtk_pcie_power_up(struct mtk_pcie_port *port)
 {
+	struct mtk_gen3_pcie *pcie = port->pcie;
 	struct device *dev = pcie->dev;
 	int err;
 
@@ -1042,13 +1056,13 @@ static int mtk_pcie_setup(struct mtk_gen3_pcie *pcie)
 	reset_control_assert(pcie->mac_reset);
 	usleep_range(10, 20);
 
-	/* Don't touch the hardware registers before power up */
-	err = mtk_pcie_power_up(pcie);
-	if (err)
-		goto err_irq_teardown;
-
 	/* Try link up */
 	list_for_each_entry(port, &pcie->ports, list) {
+		/* Don't touch the hardware registers before power up */
+		err = pcie->soc->power_up(port);
+		if (err)
+			goto err_power_down;
+
 		err = mtk_pcie_startup_port(port, &entry);
 		if (err)
 			goto err_power_down;
@@ -1079,6 +1093,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
 
 	INIT_LIST_HEAD(&pcie->ports);
 	pcie->dev = dev;
+	pcie->soc = of_device_get_match_data(dev);
 	platform_set_drvdata(pdev, pcie);
 
 	err = mtk_pcie_setup(pcie);
@@ -1199,13 +1214,14 @@ static int mtk_pcie_resume_noirq(struct device *dev)
 	struct mtk_gen3_pcie *pcie = dev_get_drvdata(dev);
 	struct resource_entry *entry = NULL;
 	struct mtk_pcie_port *port;
-	int err;
-
-	err = mtk_pcie_power_up(pcie);
-	if (err)
-		return err;
 
 	list_for_each_entry(port, &pcie->ports, list) {
+		int err;
+
+		err = pcie->soc->power_up(port);
+		if (err)
+			return err;
+
 		err = mtk_pcie_startup_port(port, &entry);
 		if (err) {
 			mtk_pcie_power_down(pcie);
@@ -1223,8 +1239,12 @@ static const struct dev_pm_ops mtk_pcie_pm_ops = {
 				  mtk_pcie_resume_noirq)
 };
 
+static const struct mtk_pcie_soc mtk_pcie_soc_mt8192 = {
+	.power_up = mtk_pcie_power_up,
+};
+
 static const struct of_device_id mtk_pcie_of_match[] = {
-	{ .compatible = "mediatek,mt8192-pcie" },
+	{ .compatible = "mediatek,mt8192-pcie", .data = &mtk_pcie_soc_mt8192 },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mtk_pcie_of_match);
