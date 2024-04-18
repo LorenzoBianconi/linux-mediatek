@@ -1248,8 +1248,21 @@ static int airoha_pcie_phy_init(struct phy *phy)
 	return 0;
 }
 
+static int airoha_pcie_phy_exit(struct phy *phy)
+{
+	struct airoha_pcie_phy *pcie_phy = phy_get_drvdata(phy);
+
+	airoha_phy_pma0_clear_bits(pcie_phy, REG_PCIE_PMA_SW_RESET,
+				   PCIE_PMA_SW_RST);
+	airoha_phy_pma1_clear_bits(pcie_phy, REG_PCIE_PMA_SW_RESET,
+				   PCIE_PMA_SW_RST);
+
+	return 0;
+}
+
 static const struct phy_ops airoha_pcie_phy_ops = {
 	.init = airoha_pcie_phy_init,
+	.exit = airoha_pcie_phy_exit,
 	.owner = THIS_MODULE,
 };
 
