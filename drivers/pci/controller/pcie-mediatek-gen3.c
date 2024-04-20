@@ -113,6 +113,18 @@ struct mtk_msi_set {
 };
 
 /**
+ * struct mtk_pcie_port - PCIe port information
+ * @pcie: pointer to PCIe host info
+ * @list: port list
+ * @slot: port slot
+ */
+struct mtk_pcie_port {
+	struct mtk_gen3_pcie *pcie;
+	struct list_head list;
+	u32 slot;
+};
+
+/**
  * struct mtk_gen3_pcie - PCIe port information
  * @dev: pointer to PCIe device
  * @base: IO mapped register base
@@ -133,6 +145,7 @@ struct mtk_msi_set {
  * @msi_irq_in_use: bit map for assigned MSI IRQ
  */
 struct mtk_gen3_pcie {
+	struct list_head ports;
 	struct device *dev;
 	void __iomem *base;
 	phys_addr_t reg_base;
@@ -184,8 +197,34 @@ static const char *const ltssm_str[] = {
 	"hotreset",			/* 0x1A */
 };
 
+static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
+						unsigned int devfn)
+{
+	struct mtk_gen3_pcie *pcie = bus->sysdata;
+	struct mtk_pcie_port *port;
+
+	/*
+	 * Walk the bus hierarchy to get the devfn value
+	 * of the port in the root bus.
+	 */
+	while (bus && bus->number) {
+		struct pci_dev *dev = bus->self;
+
+		bus = dev->bus;
+		devfn = dev->devfn;
+	}
+
+	list_for_each_entry(port, &pcie->ports, list) {
+		if (port->slot == PCI_SLOT(devfn))
+			return port;
+	}
+
+	return NULL;
+}
+
 /**
  * mtk_pcie_config_tlp_header() - Configure a configuration TLP header
+ * @port: port info.
  * @bus: PCI bus to query
  * @devfn: device/function number
  * @where: offset in config space
@@ -193,10 +232,11 @@ static const char *const ltssm_str[] = {
  *
  * Set byte enable field and device information in configuration TLP header.
  */
-static void mtk_pcie_config_tlp_header(struct pci_bus *bus, unsigned int devfn,
-					int where, int size)
+static void mtk_pcie_config_tlp_header(struct mtk_pcie_port *port,
+				       struct pci_bus *bus, unsigned int devfn,
+				       int where, int size)
 {
-	struct mtk_gen3_pcie *pcie = bus->sysdata;
+	struct mtk_gen3_pcie *pcie = port->pcie;
 	int bytes;
 	u32 val;
 
@@ -211,15 +251,25 @@ static void mtk_pcie_config_tlp_header(struct pci_bus *bus, unsigned int devfn,
 static void __iomem *mtk_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
 				      int where)
 {
-	struct mtk_gen3_pcie *pcie = bus->sysdata;
+	struct mtk_pcie_port *port;
 
-	return pcie->base + PCIE_CFG_OFFSET_ADDR + where;
+	port = mtk_pcie_find_port(bus, devfn);
+	if (!port)
+		return NULL;
+
+	return port->pcie->base + PCIE_CFG_OFFSET_ADDR + where;
 }
 
 static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
 				int where, int size, u32 *val)
 {
-	mtk_pcie_config_tlp_header(bus, devfn, where, size);
+	struct mtk_pcie_port *port;
+
+	port = mtk_pcie_find_port(bus, devfn);
+	if (!port)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	mtk_pcie_config_tlp_header(port, bus, devfn, where, size);
 
 	return pci_generic_config_read32(bus, devfn, where, size, val);
 }
@@ -227,7 +277,13 @@ static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
 static int mtk_pcie_config_write(struct pci_bus *bus, unsigned int devfn,
 				 int where, int size, u32 val)
 {
-	mtk_pcie_config_tlp_header(bus, devfn, where, size);
+	struct mtk_pcie_port *port;
+
+	port = mtk_pcie_find_port(bus, devfn);
+	if (!port)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	mtk_pcie_config_tlp_header(port, bus, devfn, where, size);
 
 	if (size <= 2)
 		val <<= (where & 0x3) * 8;
@@ -241,12 +297,13 @@ static struct pci_ops mtk_pcie_ops = {
 	.write = mtk_pcie_config_write,
 };
 
-static int mtk_pcie_set_trans_table(struct mtk_gen3_pcie *pcie,
+static int mtk_pcie_set_trans_table(struct mtk_pcie_port *port,
 				    resource_size_t cpu_addr,
 				    resource_size_t pci_addr,
 				    resource_size_t size,
 				    unsigned long type, int *num)
 {
+	struct mtk_gen3_pcie *pcie = port->pcie;
 	resource_size_t remaining = size;
 	resource_size_t table_size;
 	resource_size_t addr_align;
@@ -303,8 +360,9 @@ static int mtk_pcie_set_trans_table(struct mtk_gen3_pcie *pcie,
 	return 0;
 }
 
-static void mtk_pcie_enable_msi(struct mtk_gen3_pcie *pcie)
+static void mtk_pcie_enable_msi(struct mtk_pcie_port *port)
 {
+	struct mtk_gen3_pcie *pcie = port->pcie;
 	int i;
 	u32 val;
 
@@ -332,10 +390,11 @@ static void mtk_pcie_enable_msi(struct mtk_gen3_pcie *pcie)
 	writel_relaxed(val, pcie->base + PCIE_INT_ENABLE_REG);
 }
 
-static int mtk_pcie_startup_port(struct mtk_gen3_pcie *pcie)
+static int mtk_pcie_startup_port(struct mtk_pcie_port *port)
 {
-	struct resource_entry *entry;
+	struct mtk_gen3_pcie *pcie = port->pcie;
 	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
+	struct resource_entry *entry;
 	unsigned int table_index = 0;
 	int err;
 	u32 val;
@@ -396,7 +455,7 @@ static int mtk_pcie_startup_port(struct mtk_gen3_pcie *pcie)
 		return err;
 	}
 
-	mtk_pcie_enable_msi(pcie);
+	mtk_pcie_enable_msi(port);
 
 	/* Set PCIe translation windows */
 	resource_list_for_each_entry(entry, &host->windows) {
@@ -415,7 +474,7 @@ static int mtk_pcie_startup_port(struct mtk_gen3_pcie *pcie)
 
 		pci_addr = res->start - entry->offset;
 		size = resource_size(res);
-		err = mtk_pcie_set_trans_table(pcie, cpu_addr, pci_addr, size,
+		err = mtk_pcie_set_trans_table(port, cpu_addr, pci_addr, size,
 					       type, &table_index);
 		if (err)
 			return err;
@@ -635,8 +694,9 @@ static const struct irq_domain_ops intx_domain_ops = {
 	.map = mtk_pcie_intx_map,
 };
 
-static int mtk_pcie_init_irq_domains(struct mtk_gen3_pcie *pcie)
+static int mtk_pcie_init_irq_domains(struct mtk_pcie_port *port)
 {
+	struct mtk_gen3_pcie *pcie = port->pcie;
 	struct device *dev = pcie->dev;
 	struct device_node *intc_node, *node = dev->of_node;
 	int ret;
@@ -754,13 +814,14 @@ static void mtk_pcie_irq_handler(struct irq_desc *desc)
 	chained_irq_exit(irqchip, desc);
 }
 
-static int mtk_pcie_setup_irq(struct mtk_gen3_pcie *pcie)
+static int mtk_pcie_setup_irq(struct mtk_pcie_port *port)
 {
+	struct mtk_gen3_pcie *pcie = port->pcie;
 	struct device *dev = pcie->dev;
 	struct platform_device *pdev = to_platform_device(dev);
 	int err;
 
-	err = mtk_pcie_init_irq_domains(pcie);
+	err = mtk_pcie_init_irq_domains(port);
 	if (err)
 		return err;
 
@@ -773,7 +834,30 @@ static int mtk_pcie_setup_irq(struct mtk_gen3_pcie *pcie)
 	return 0;
 }
 
-static int mtk_pcie_parse_port(struct mtk_gen3_pcie *pcie)
+static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie, int slot)
+{
+	struct device *dev = pcie->dev;
+	struct mtk_pcie_port *port;
+
+	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+	if (!port)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&port->list);
+	port->pcie = pcie;
+	port->slot = slot;
+
+	list_add_tail(&port->list, &pcie->ports);
+
+	return 0;
+}
+
+static int mtk_pcie_parse_ports(struct mtk_gen3_pcie *pcie)
+{
+	return mtk_pcie_alloc_port(pcie, 0);
+}
+
+static int mtk_pcie_get_resources(struct mtk_gen3_pcie *pcie)
 {
 	struct device *dev = pcie->dev;
 	struct platform_device *pdev = to_platform_device(dev);
@@ -889,9 +973,14 @@ static void mtk_pcie_power_down(struct mtk_gen3_pcie *pcie)
 
 static int mtk_pcie_setup(struct mtk_gen3_pcie *pcie)
 {
+	struct mtk_pcie_port *port;
 	int err;
 
-	err = mtk_pcie_parse_port(pcie);
+	err = mtk_pcie_parse_ports(pcie);
+	if (err)
+		return err;
+
+	err = mtk_pcie_get_resources(pcie);
 	if (err)
 		return err;
 
@@ -909,13 +998,15 @@ static int mtk_pcie_setup(struct mtk_gen3_pcie *pcie)
 		return err;
 
 	/* Try link up */
-	err = mtk_pcie_startup_port(pcie);
-	if (err)
-		goto err_setup;
+	list_for_each_entry(port, &pcie->ports, list) {
+		err = mtk_pcie_startup_port(port);
+		if (err)
+			goto err_setup;
 
-	err = mtk_pcie_setup_irq(pcie);
-	if (err)
-		goto err_setup;
+		err = mtk_pcie_setup_irq(port);
+		if (err)
+			goto err_setup;
+	}
 
 	return 0;
 
@@ -938,6 +1029,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
 
 	pcie = pci_host_bridge_priv(host);
 
+	INIT_LIST_HEAD(&pcie->ports);
 	pcie->dev = dev;
 	platform_set_drvdata(pdev, pcie);
 
@@ -1052,16 +1144,19 @@ static int mtk_pcie_suspend_noirq(struct device *dev)
 static int mtk_pcie_resume_noirq(struct device *dev)
 {
 	struct mtk_gen3_pcie *pcie = dev_get_drvdata(dev);
+	struct mtk_pcie_port *port;
 	int err;
 
 	err = mtk_pcie_power_up(pcie);
 	if (err)
 		return err;
 
-	err = mtk_pcie_startup_port(pcie);
-	if (err) {
-		mtk_pcie_power_down(pcie);
-		return err;
+	list_for_each_entry(port, &pcie->ports, list) {
+		err = mtk_pcie_startup_port(port);
+		if (err) {
+			mtk_pcie_power_down(pcie);
+			return err;
+		}
 	}
 
 	mtk_pcie_irq_restore(pcie);
