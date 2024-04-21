@@ -847,6 +847,7 @@ static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie, int slot)
 {
 	struct device *dev = pcie->dev;
 	struct mtk_pcie_port *port;
+	int err;
 
 	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
 	if (!port)
@@ -855,6 +856,10 @@ static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie, int slot)
 	INIT_LIST_HEAD(&port->list);
 	port->pcie = pcie;
 	port->slot = slot;
+
+	err = mtk_pcie_setup_irq(port);
+	if (err)
+		return err;
 
 	list_add_tail(&port->list, &pcie->ports);
 
@@ -987,11 +992,11 @@ static int mtk_pcie_setup(struct mtk_gen3_pcie *pcie)
 
 	err = mtk_pcie_parse_ports(pcie);
 	if (err)
-		return err;
+		goto err_irq_teardown;
 
 	err = mtk_pcie_get_resources(pcie);
 	if (err)
-		return err;
+		goto err_irq_teardown;
 
 	/*
 	 * The controller may have been left out of reset by the bootloader
@@ -1004,24 +1009,21 @@ static int mtk_pcie_setup(struct mtk_gen3_pcie *pcie)
 	/* Don't touch the hardware registers before power up */
 	err = mtk_pcie_power_up(pcie);
 	if (err)
-		return err;
+		goto err_irq_teardown;
 
 	/* Try link up */
 	list_for_each_entry(port, &pcie->ports, list) {
 		err = mtk_pcie_startup_port(port);
 		if (err)
-			goto err_setup;
-
-		err = mtk_pcie_setup_irq(port);
-		if (err)
-			goto err_setup;
+			goto err_power_down;
 	}
 
 	return 0;
 
-err_setup:
-	mtk_pcie_irq_teardown(pcie);
+err_power_down:
 	mtk_pcie_power_down(pcie);
+err_irq_teardown:
+	mtk_pcie_irq_teardown(pcie);
 
 	return err;
 }
