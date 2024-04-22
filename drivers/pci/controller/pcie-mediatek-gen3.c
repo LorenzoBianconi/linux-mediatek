@@ -694,11 +694,12 @@ static const struct irq_domain_ops intx_domain_ops = {
 	.map = mtk_pcie_intx_map,
 };
 
-static int mtk_pcie_init_irq_domains(struct mtk_pcie_port *port)
+static int mtk_pcie_init_irq_domains(struct mtk_pcie_port *port,
+				     struct device_node *node)
 {
 	struct mtk_gen3_pcie *pcie = port->pcie;
 	struct device *dev = pcie->dev;
-	struct device_node *intc_node, *node = dev->of_node;
+	struct device_node *intc_node;
 	int ret;
 
 	raw_spin_lock_init(&port->irq_lock);
@@ -818,12 +819,13 @@ static void mtk_pcie_irq_handler(struct irq_desc *desc)
 	chained_irq_exit(irqchip, desc);
 }
 
-static int mtk_pcie_setup_irq(struct mtk_pcie_port *port)
+static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
+			      struct device_node *node)
 {
 	struct platform_device *pdev = to_platform_device(port->pcie->dev);
 	int err;
 
-	err = mtk_pcie_init_irq_domains(port);
+	err = mtk_pcie_init_irq_domains(port, node);
 	if (err)
 		return err;
 
@@ -837,7 +839,8 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port)
 	return 0;
 }
 
-static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie, int slot)
+static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie,
+			       struct device_node *node, int slot)
 {
 	struct device *dev = pcie->dev;
 	struct platform_device *pdev = to_platform_device(dev);
@@ -864,7 +867,7 @@ static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie, int slot)
 	port->pcie = pcie;
 	port->slot = slot;
 
-	err = mtk_pcie_setup_irq(port);
+	err = mtk_pcie_setup_irq(port, node);
 	if (err)
 		return err;
 
@@ -875,7 +878,9 @@ static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie, int slot)
 
 static int mtk_pcie_parse_ports(struct mtk_gen3_pcie *pcie)
 {
-	return mtk_pcie_alloc_port(pcie, 0);
+	struct device *dev = pcie->dev;
+
+	return mtk_pcie_alloc_port(pcie, dev->of_node, 0);
 }
 
 static int mtk_pcie_get_resources(struct mtk_gen3_pcie *pcie)
