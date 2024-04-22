@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/msi.h>
+#include <linux/of_pci.h>
 #include <linux/pci.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
@@ -876,11 +877,46 @@ static int mtk_pcie_alloc_port(struct mtk_gen3_pcie *pcie,
 	return 0;
 }
 
+static void mtk_pcie_release_ports(struct mtk_gen3_pcie *pcie)
+{
+	struct mtk_pcie_port *port, *tmp;
+	struct device *dev = pcie->dev;
+
+	mtk_pcie_irq_teardown(pcie);
+	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+		devm_iounmap(dev, port->base);
+		list_del(&port->list);
+		devm_kfree(dev, port);
+	}
+}
+
 static int mtk_pcie_parse_ports(struct mtk_gen3_pcie *pcie)
 {
 	struct device *dev = pcie->dev;
+	struct device_node *node = dev->of_node, *child;
 
-	return mtk_pcie_alloc_port(pcie, dev->of_node, 0);
+	for_each_available_child_of_node(node, child) {
+		int err, slot;
+
+		err = of_pci_get_devfn(child);
+		if (err < 0) {
+			dev_err(dev, "failed to get devfn: %d\n", err);
+			goto error_put_node;
+		}
+
+		slot = PCI_SLOT(err);
+		err = mtk_pcie_alloc_port(pcie, child, slot);
+		if (err < 0)
+			goto error_put_node;
+	}
+
+	return 0;
+
+error_put_node:
+	of_node_put(child);
+	mtk_pcie_release_ports(pcie);
+
+	return mtk_pcie_alloc_port(pcie, node, 0);
 }
 
 static int mtk_pcie_get_resources(struct mtk_gen3_pcie *pcie)
