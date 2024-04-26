@@ -54,3 +54,15 @@
 	pinctrl-0 = <&pcie1_rst_pins>;
 	status = "okay";
 };
+
+&eth {
+	status = "okay";
+};
+
+&gdm1 {
+	status = "okay";
+};
+
+&switch {
+	status = "okay";
+};
