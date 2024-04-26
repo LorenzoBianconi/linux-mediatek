@@ -28,3 +28,7 @@
 &eth0 {
 	status = "okay";
 };
+
+&switch {
+	status = "okay";
+};
