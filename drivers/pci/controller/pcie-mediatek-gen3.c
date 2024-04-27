@@ -105,7 +105,7 @@
 #define PCIE_ATR_TLP_TYPE_MEM		PCIE_ATR_TLP_TYPE(0)
 #define PCIE_ATR_TLP_TYPE_IO		PCIE_ATR_TLP_TYPE(2)
 
-#define MAX_NUM_PHY_RSTS		1
+#define MAX_NUM_PHY_RSTS		3
 
 struct mtk_gen3_pcie;
 
@@ -863,13 +863,10 @@ static int mtk_pcie_en7581_power_up(struct mtk_gen3_pcie *pcie)
 	writel_relaxed(0x50500032, pcie->base + 0x15030);
 	writel_relaxed(0x50500032, pcie->base + 0x15130);
 
-	/* PHY power on and enable pipe clock */
-	reset_control_deassert(pcie->phy_reset);
-
 	err = phy_init(pcie->phy);
 	if (err) {
 		dev_err(dev, "failed to initialize PHY\n");
-		goto err_phy_init;
+		return err;
 	}
 	mdelay(30);
 
@@ -879,8 +876,13 @@ static int mtk_pcie_en7581_power_up(struct mtk_gen3_pcie *pcie)
 		goto err_phy_on;
 	}
 
-	/* MAC power on and enable transaction layer clocks */
-	reset_control_deassert(pcie->mac_reset);
+	err = reset_control_bulk_deassert(pcie->soc->phy_resets.num_rsts,
+					  pcie->phy_resets);
+	if (err) {
+		dev_err(dev, "failed to deassert PHYs\n");
+		goto err_phy_deassert;
+	}
+	usleep_range(5000, 10000);
 
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
@@ -908,12 +910,12 @@ err_clk_enable:
 err_clk_prepare:
 	pm_runtime_put_sync(dev);
 	pm_runtime_disable(dev);
-	reset_control_assert(pcie->mac_reset);
+	reset_control_bulk_assert(pcie->soc->phy_resets.num_rsts,
+				  pcie->phy_resets);
+err_phy_deassert:
 	phy_power_off(pcie->phy);
 err_phy_on:
 	phy_exit(pcie->phy);
-err_phy_init:
-	reset_control_assert(pcie->phy_reset);
 
 	return err;
 }
@@ -1189,6 +1191,12 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt8192 = {
 
 static const struct mtk_pcie_soc mtk_pcie_soc_en7581 = {
 	.power_up = mtk_pcie_en7581_power_up,
+	.phy_resets = {
+		.id[0] = "phy_lane0",
+		.id[1] = "phy_lane1",
+		.id[2] = "phy_lane2",
+		.num_rsts = 3,
+	},
 };
 
 static const struct of_device_id mtk_pcie_of_match[] = {
