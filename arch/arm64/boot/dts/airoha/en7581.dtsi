@@ -263,5 +263,28 @@
 				#interrupt-cells = <1>;
 			};
 		};
+
+		eth0: ethernet@1fb50000 {
+			compatible = "airoha,en7581-eth";
+			reg = <0 0x1fb50000 0 0x2600>,
+			      <0 0x1fb54000 0 0x4000>;
+
+			resets = <&scuclk EN7581_FE_RST>,
+				 <&scuclk EN7581_FE_PDMA_RST>,
+				 <&scuclk EN7581_FE_QDMA_RST>;
+			reset-names = "fe", "pdma", "qdma";
+
+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			phy-mode = "internal";
+			fixed-link {
+				speed = <10000>;
+				full-duplex;
+				pause;
+			};
+		};
 	};
 };
