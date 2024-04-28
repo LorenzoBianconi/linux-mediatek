@@ -33,6 +33,14 @@ source "drivers/net/ethernet/arc/Kconfig"
 source "drivers/net/ethernet/asix/Kconfig"
 source "drivers/net/ethernet/atheros/Kconfig"
 
+config NET_AIROHA
+	tristate "Airoha SoC Gigabit Ethernet support"
+	depends on ARCH_AIROHA || COMPILE_TEST
+	depends on NET_DSA || !NET_DSA
+	help
+	  This driver supports the gigabit ethernet MACs in the
+	  Airoha SoC family.
+
 config CX_ECAT
 	tristate "Beckhoff CX5020 EtherCAT master support"
 	depends on PCI
