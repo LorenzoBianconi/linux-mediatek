@@ -1,0 +1,387 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2024 Lorenzo Bianconi <lorenzo@kernel.org>
+ */
+
+#define AIROHA_MAX_NUM_RSTS	3
+#define AIROHA_MAX_MTU		2000
+#define AIROHA_HW_FEATURES	(NETIF_F_IP_CSUM | NETIF_F_RXCSUM |	\
+				 NETIF_F_HW_VLAN_CTAG_TX | 		\
+				 NETIF_F_SG | NETIF_F_TSO |		\
+				 NETIF_F_TSO6 | NETIF_F_IPV6_CSUM)
+#define AIROHA_NUM_TX_RING	32
+#define AIROHA_NUM_RX_RING	32
+#define TX_DSCP_NUM(_n)		((_n) ? 128 : 1536)
+#define RX_DSCP_NUM(_n)		\
+	((_n) ==  2 ? 128 :	\
+	 (_n) == 11 ? 128 :	\
+	 (_n) == 15 ? 128 :	\
+	 (_n) ==  0 ? 1024 : 16)
+#define HW_DSCP_NUM		1024
+#define MAX_PKT_LEN		2048
+
+/* FE */
+#define CDMA1_BASE			0x0400
+#define GDMA1_BASE			0x0500
+#define GDMA2_BASE			0x1500
+#define GDMA3_BASE			0x1100
+#define GDMA4_BASE			0x2400
+
+#define REG_FE_LAN_MAC_H		0x0040
+#define REG_FE_LAN_MAC_LMIN		0x0044
+#define REG_FE_LAN_MAC_LMAX		0x0048
+#define REG_FE_VIP_PORT_EN		0x01f0
+#define REG_FE_IFC_PORT_EN		0x01f4
+
+#define REG_CDMA1_VLAN_CTRL		CDMA1_BASE
+#define CDMA1_VLAN_MASK			GENMASK(31, 16)
+
+#define REG_GDMA1_FWD_CFG		GDMA1_BASE
+#define GDMA1_OCFQ_MASK			GENMASK(3, 0)
+#define GDMA1_MCFQ_MASK			GENMASK(7, 4)
+#define GDMA1_BCFQ_MASK			GENMASK(11, 8)
+#define GDMA1_UCFQ_MASK			GENMASK(15, 12)
+#define GDMA1_TCP_CKSUM			BIT(21)
+
+#define REG_GDMA1_LEN_CFG		(GDMA1_BASE + 0x14)
+#define GDMA1_SHORT_LEN_MASK		GENMASK(13, 0)
+#define GDMA1_LONG_LEN_MASK		GENMASK(29, 16)
+
+#define REG_FE_CPORT_CFG		(GDMA1_BASE + 0x40)
+#define FE_CPORT_PAD			BIT(26)
+
+#define REG_GDMA3_FWD_CFG		GDMA3_BASE
+#define REG_GDMA4_FWD_CFG		(GDMA4_BASE + 0x100)
+
+#define REG_CDM5_RX_OQ1_DROP_CNT	0x29d4
+
+/* QDMA */
+#define REG_QDMA_GLOBAL_CFG			0x0004
+#define GLOBAL_CFG_RX_2B_OFFSET			BIT(31)
+#define GLOBAL_CFG_DMA_PREFERENCE_MASK		GENMASK(30, 29)
+#define GLOBAL_CFG_CPU_TXR_ROUND_ROBIN		BIT(28)
+#define GLOBAL_CFG_DSCP_BYTE_SWAP		BIT(27)
+#define GLOBAL_CFG_PAYLOAD_BYTE_SWAP		BIT(26)
+#define GLOBAL_CFG_MULTICAST_MODIFY_FP		BIT(25)
+#define GLOBAL_CFG_OAM_MODIFY_MASK		BIT(24)
+#define GLOBAL_CFG_RESET_MASK			BIT(23)
+#define GLOBAL_CFG_RESET_DONE_MASK		BIT(22)
+#define GLOBAL_CFG_MULTICAST_EN_MASK		BIT(21)
+#define GLOBAL_CFG_IRQ1_EN			BIT(20)
+#define GLOBAL_CFG_IRQ0_EN			BIT(19)
+#define GLOBAL_CFG_LOOPCNT_EN			BIT(18)
+#define GLOBAL_CFG_RD_BYPASS_WR			BIT(17)
+#define GLOBAL_CFG_QDMA_LOOPBACK		BIT(16)
+#define GLOBAL_CFG_LPBK_RXQ_SEL_MASK		GENMASK(13, 8)
+#define GLOBAL_CFG_CHECK_DONE			BIT(7)
+#define GLOBAL_CFG_TX_WB_DONE			BIT(6)
+#define GLOBAL_CFG_MAX_ISSUE_NUM_MASK		GENMASK(5, 4)
+#define GLOBAL_CFG_RX_DMA_BUSY			BIT(3)
+#define GLOBAL_CFG_RX_DMA_EN			BIT(2)
+#define GLOBAL_CFG_TX_DMA_BUSY			BIT(1)
+#define GLOBAL_CFG_TX_DMA_EN			BIT(0)
+
+#define REG_FWD_DSCP_BASE		0x0010
+#define REG_FWD_BUF_BASE		0x0014
+
+#define REG_HW_FWD_DSCP_CFG		0x0018
+#define HW_FWD_DSCP_PAYLOAD_SIZE_MASK	GENMASK(29, 28)
+
+#define REG_INT_STATUS(_n)		\
+	((_n) == 4) ? 0x0730 :		\
+	((_n) == 3) ? 0x0724 :		\
+	((_n) == 2) ? 0x0720 :		\
+	((_n) == 1) ? 0x0024 : 0x0020
+
+#define REG_INT_ENABLE(_n)		\
+	((_n) == 4) ? 0x0750 :		\
+	((_n) == 3) ? 0x0744 :		\
+	((_n) == 2) ? 0x0740 :		\
+	((_n) == 1) ? 0x002c : 0x0028
+
+/* QDMA_CSR_INT_ENABLE1 */
+#define RX15_COHERENT_INT_MASK		BIT(31)
+#define RX14_COHERENT_INT_MASK		BIT(30)
+#define RX13_COHERENT_INT_MASK		BIT(29)
+#define RX12_COHERENT_INT_MASK		BIT(28)
+#define RX11_COHERENT_INT_MASK		BIT(27)
+#define RX10_COHERENT_INT_MASK		BIT(26)
+#define RX9_COHERENT_INT_MASK		BIT(25)
+#define RX8_COHERENT_INT_MASK		BIT(24)
+#define RX7_COHERENT_INT_MASK		BIT(23)
+#define RX6_COHERENT_INT_MASK		BIT(22)
+#define RX5_COHERENT_INT_MASK		BIT(21)
+#define RX4_COHERENT_INT_MASK		BIT(20)
+#define RX3_COHERENT_INT_MASK		BIT(19)
+#define RX2_COHERENT_INT_MASK		BIT(18)
+#define RX1_COHERENT_INT_MASK		BIT(17)
+#define RX0_COHERENT_INT_MASK		BIT(16)
+#define TX7_COHERENT_INT_MASK		BIT(15)
+#define TX6_COHERENT_INT_MASK		BIT(14)
+#define TX5_COHERENT_INT_MASK		BIT(13)
+#define TX4_COHERENT_INT_MASK		BIT(12)
+#define TX3_COHERENT_INT_MASK		BIT(11)
+#define TX2_COHERENT_INT_MASK		BIT(10)
+#define TX1_COHERENT_INT_MASK		BIT(9)
+#define TX0_COHERENT_INT_MASK		BIT(8)
+#define CNT_OVER_FLOW_INT_MASK		BIT(7)
+#define IRQ2_FULL_INT_MASK		BIT(5)
+#define IRQ2_INT_MASK			BIT(4)
+#define HWFWD_DSCP_LOW_INT_MASK		BIT(3)
+#define HWFWD_DSCP_EMPTY_INT_MASK	BIT(2)
+#define IRQ_FULL_INT_MASK		BIT(1)
+#define IRQ_INT_MASK			BIT(0)
+
+#define INT_IDX0_MASK						\
+	(TX0_COHERENT_INT_MASK | TX1_COHERENT_INT_MASK |	\
+	 TX2_COHERENT_INT_MASK | TX3_COHERENT_INT_MASK |	\
+	 TX4_COHERENT_INT_MASK | TX5_COHERENT_INT_MASK |	\
+	 TX6_COHERENT_INT_MASK | TX7_COHERENT_INT_MASK |	\
+	 RX0_COHERENT_INT_MASK | RX1_COHERENT_INT_MASK |	\
+	 RX2_COHERENT_INT_MASK | RX3_COHERENT_INT_MASK |	\
+	 RX4_COHERENT_INT_MASK | RX7_COHERENT_INT_MASK |	\
+	 RX8_COHERENT_INT_MASK | RX9_COHERENT_INT_MASK |	\
+	 RX15_COHERENT_INT_MASK |				\
+	 IRQ_INT_MASK | IRQ2_INT_MASK | IRQ_FULL_INT_MASK)
+
+/* QDMA_CSR_INT_ENABLE2 */
+#define RX15_NO_CPU_DSCP_INT_MASK	BIT(31)
+#define RX14_NO_CPU_DSCP_INT_MASK	BIT(30)
+#define RX13_NO_CPU_DSCP_INT_MASK	BIT(29)
+#define RX12_NO_CPU_DSCP_INT_MASK	BIT(28)
+#define RX11_NO_CPU_DSCP_INT_MASK	BIT(27)
+#define RX10_NO_CPU_DSCP_INT_MASK	BIT(26)
+#define RX9_NO_CPU_DSCP_INT_MASK	BIT(25)
+#define RX8_NO_CPU_DSCP_INT_MASK	BIT(24)
+#define RX7_NO_CPU_DSCP_INT_MASK	BIT(23)
+#define RX6_NO_CPU_DSCP_INT_MASK	BIT(22)
+#define RX5_NO_CPU_DSCP_INT_MASK	BIT(21)
+#define RX4_NO_CPU_DSCP_INT_MASK	BIT(20)
+#define RX3_NO_CPU_DSCP_INT_MASK	BIT(19)
+#define RX2_NO_CPU_DSCP_INT_MASK	BIT(18)
+#define RX1_NO_CPU_DSCP_INT_MASK	BIT(17)
+#define RX0_NO_CPU_DSCP_INT_MASK	BIT(16)
+#define RX15_DONE_INT_MASK		BIT(15)
+#define RX14_DONE_INT_MASK		BIT(14)
+#define RX13_DONE_INT_MASK		BIT(13)
+#define RX12_DONE_INT_MASK		BIT(12)
+#define RX11_DONE_INT_MASK		BIT(11)
+#define RX10_DONE_INT_MASK		BIT(10)
+#define RX9_DONE_INT_MASK		BIT(9)
+#define RX8_DONE_INT_MASK		BIT(8)
+#define RX7_DONE_INT_MASK		BIT(7)
+#define RX6_DONE_INT_MASK		BIT(6)
+#define RX5_DONE_INT_MASK		BIT(5)
+#define RX4_DONE_INT_MASK		BIT(4)
+#define RX3_DONE_INT_MASK		BIT(3)
+#define RX2_DONE_INT_MASK		BIT(2)
+#define RX1_DONE_INT_MASK		BIT(1)
+#define RX0_DONE_INT_MASK		BIT(0)
+
+#define RX_DONE_INT_MASK					\
+	(RX0_DONE_INT_MASK | RX1_DONE_INT_MASK |		\
+	 RX2_DONE_INT_MASK | RX3_DONE_INT_MASK |		\
+	 RX4_DONE_INT_MASK | RX7_DONE_INT_MASK |		\
+	 RX8_DONE_INT_MASK | RX9_DONE_INT_MASK |		\
+	 RX15_DONE_INT_MASK)
+#define INT_IDX1_MASK						\
+	(RX_DONE_INT_MASK |					\
+	 RX0_NO_CPU_DSCP_INT_MASK | RX1_NO_CPU_DSCP_INT_MASK |	\
+	 RX2_NO_CPU_DSCP_INT_MASK | RX3_NO_CPU_DSCP_INT_MASK |	\
+	 RX4_NO_CPU_DSCP_INT_MASK | RX7_NO_CPU_DSCP_INT_MASK |	\
+	 RX8_NO_CPU_DSCP_INT_MASK | RX9_NO_CPU_DSCP_INT_MASK |	\
+	 RX15_NO_CPU_DSCP_INT_MASK)
+
+/* QDMA_CSR_INT_ENABLE5 */
+#define TX31_COHERENT_INT_MASK		BIT(31)
+#define TX30_COHERENT_INT_MASK		BIT(30)
+#define TX29_COHERENT_INT_MASK		BIT(29)
+#define TX28_COHERENT_INT_MASK		BIT(28)
+#define TX27_COHERENT_INT_MASK		BIT(27)
+#define TX26_COHERENT_INT_MASK		BIT(26)
+#define TX25_COHERENT_INT_MASK		BIT(25)
+#define TX24_COHERENT_INT_MASK		BIT(24)
+#define TX23_COHERENT_INT_MASK		BIT(23)
+#define TX22_COHERENT_INT_MASK		BIT(22)
+#define TX21_COHERENT_INT_MASK		BIT(21)
+#define TX20_COHERENT_INT_MASK		BIT(20)
+#define TX19_COHERENT_INT_MASK		BIT(19)
+#define TX18_COHERENT_INT_MASK		BIT(18)
+#define TX17_COHERENT_INT_MASK		BIT(17)
+#define TX16_COHERENT_INT_MASK		BIT(16)
+#define TX15_COHERENT_INT_MASK		BIT(15)
+#define TX14_COHERENT_INT_MASK		BIT(14)
+#define TX13_COHERENT_INT_MASK		BIT(13)
+#define TX12_COHERENT_INT_MASK		BIT(12)
+#define TX11_COHERENT_INT_MASK		BIT(11)
+#define TX10_COHERENT_INT_MASK		BIT(10)
+#define TX9_COHERENT_INT_MASK		BIT(9)
+#define TX8_COHERENT_INT_MASK		BIT(8)
+
+#define INT_IDX4_MASK						\
+	(TX8_COHERENT_INT_MASK | TX9_COHERENT_INT_MASK |	\
+	 TX10_COHERENT_INT_MASK | TX11_COHERENT_INT_MASK |	\
+	 TX12_COHERENT_INT_MASK | TX13_COHERENT_INT_MASK |	\
+	 TX14_COHERENT_INT_MASK | TX15_COHERENT_INT_MASK |	\
+	 TX16_COHERENT_INT_MASK | TX17_COHERENT_INT_MASK |	\
+	 TX18_COHERENT_INT_MASK | TX19_COHERENT_INT_MASK |	\
+	 TX20_COHERENT_INT_MASK | TX21_COHERENT_INT_MASK |	\
+	 TX20_COHERENT_INT_MASK | TX21_COHERENT_INT_MASK |	\
+	 TX22_COHERENT_INT_MASK | TX23_COHERENT_INT_MASK |	\
+	 TX24_COHERENT_INT_MASK | TX25_COHERENT_INT_MASK |	\
+	 TX26_COHERENT_INT_MASK | TX27_COHERENT_INT_MASK |	\
+	 TX28_COHERENT_INT_MASK | TX29_COHERENT_INT_MASK |	\
+	 TX30_COHERENT_INT_MASK | TX31_COHERENT_INT_MASK)
+
+#define REG_TX_IRQ_BASE			0x0050
+
+#define REG_TX_IRQ_CFG			0x0054
+#define TX_IRQ_THR_MASK			GENMASK(27, 16)
+#define TX_IRQ_DEPTH_MASK		GENMASK(11, 0)
+
+#define REG_TX_RING_BASE(idx)		(0x0100 + (idx << 5))
+
+#define REG_TX_CPU_IDX(idx)		(0x0108 + (idx << 5))
+#define TX_RING_CPU_IDX_MASK		GENMASK(15, 0)
+
+#define REG_TX_DMA_IDX(idx)		(0x010c + (idx << 5))
+#define TX_RING_DMA_IDX_MASK		GENMASK(15, 0)
+
+#define REG_RX_RING_BASE(idx)		(0x0200 + (idx << 5))
+
+#define REG_RX_RING_SIZE(idx)		(0x0204 + (idx << 5))
+#define RX_RING_THR_MASK		GENMASK(31, 16)
+#define RX_RING_SIZE_MASK		GENMASK(15, 0)
+
+#define REG_RX_CPU_IDX(idx)		(0x0208 + (idx << 5))
+#define RX_RING_CPU_IDX_MASK		GENMASK(15, 0)
+
+#define REG_RX_DMA_IDX(idx)		(0x020c + (idx << 5))
+#define RX_RING_DMA_IDX_MASK		GENMASK(15, 0)
+
+#define REG_LMGR_INIT_CFG		0x1000
+#define HW_FWD_PKTSIZE_OVERHEAD_MASK	GENMASK(27, 20)
+#define HW_FWD_DESC_NUM_MASK		GENMASK(16, 0)
+#define LGMR_INIT_START			BIT(31)
+
+#define REG_FWD_DSCP_LOW_THR		0x1004
+#define FWD_DSCP_LOW_THR_MASK		GENMASK(17, 0)
+
+#define REG_TXQ_CNGST_CFG		0x10a0
+#define TXQ_CNGST_DEI_DROP_EN		BIT(30)
+
+/* DW1 */
+#define QDMA_DESC_DONE_MASK		BIT(31)
+#define QDMA_DESC_DROP_MASK		BIT(30) /* tx: drop pkt - rx: overflow */
+#define QDMA_DESC_MORE_MASK		BIT(29) /* more SG elements */
+#define QDMA_DESC_DEI_MASK		BIT(25)
+#define QDMA_DESC_NO_DROP_MASK		BIT(24)
+#define QDMA_DESC_LEN_MASK		GENMASK(15, 0)
+/* DW3 */
+#define QDMA_DESC_NEXT_ID_MASK		GENMASK(15, 0)
+
+struct airoha_qdma_desc {
+	__le32 rsv;
+	__le32 ctrl;
+	__le32 addr;
+	__le32 data;
+	__le32 msg0;
+	__le32 msg1;
+	__le32 msg2;
+	__le32 msg3;
+};
+
+/* DW1 */
+#define QDMA_FWD_DESC_CTX_MASK		BIT(31)
+#define QDMA_FWD_DESC_RING_MASK		GENMASK(30, 28)
+#define QDMA_FWD_DESC_IDX_MASK		GENMASK(27, 16)
+#define QDMA_FWD_DESC_LEN_MASK		GENMASK(15, 0)
+/* DW2 */
+#define QDMA_FWD_DESC_FIRST_IDX_MASK	GENMASK(15, 0)
+/* DW3 */
+#define QDMA_FWD_DESC_MORE_PKT_NUM_MASK	GENMASK(2, 0)
+
+struct airoha_qdma_fwd_desc {
+	__le32 addr;
+	__le32 ctrl0;
+	__le32 ctrl1;
+	__le32 ctrl2;
+	__le32 msg0;
+	__le32 msg1;
+	__le32 rsv2;
+	__le32 rsv3;
+};
+
+enum {
+	QDMA_INT_REG_IDX0,
+	QDMA_INT_REG_IDX1,
+	QDMA_INT_REG_IDX2,
+	QDMA_INT_REG_IDX3,
+	QDMA_INT_REG_IDX4,
+};
+
+struct airoha_queue_entry {
+	union {
+		void *buf;
+		struct sk_buff *skb;
+	};
+	dma_addr_t dma_addr;
+	u16 dma_len;
+};
+
+struct airoha_queue {
+	struct airoha_eth *eth;
+
+	spinlock_t lock;
+	struct airoha_queue_entry *entry;
+	struct airoha_qdma_desc *desc;
+	u16 head;
+	u16 tail;
+
+	int queued;
+	int ndesc;
+	int buf_size;
+
+	struct napi_struct napi;
+	struct page_pool *page_pool;
+};
+
+struct airoha_eth {
+	struct device *dev;
+	struct net_device *net_dev;
+
+	void __iomem *qdma_regs;
+	void __iomem *fe_regs;
+
+	spinlock_t irq_lock;
+	u32 irqmask[5];
+	int irq;
+
+	struct reset_control_bulk_data resets[AIROHA_MAX_NUM_RSTS];
+
+	struct airoha_queue q_xmit[AIROHA_NUM_TX_RING];
+	struct airoha_queue q_rx[AIROHA_NUM_RX_RING];
+
+	void *irq_q;
+	void *hfwd_desc;
+	void *hfwd_q;
+
+	struct dentry *debugfs_dir;
+	u32 debugfs_reg;
+};
+
+static inline void airoha_qdma_start_rx_napi(struct airoha_eth *eth)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(eth->q_rx); i++)
+		napi_enable(&eth->q_rx[i].napi);
+}
+
+static inline void airoha_qdma_stop_rx_napi(struct airoha_eth *eth)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(eth->q_rx); i++)
+		napi_disable(&eth->q_rx[i].napi);
+}
