@@ -283,5 +283,12 @@
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
+
+		eth: ethernet@1fb50000 {
+			compatible = "airoha,en7581-eth";
+			reg = <0 0x1fb50000 0 0x2600>,
+			      <0 0x1fb54000 0 0x4000>;
+
+		};
 	};
 };
