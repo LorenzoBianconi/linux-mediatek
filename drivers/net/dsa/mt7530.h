@@ -19,6 +19,7 @@ enum mt753x_id {
 	ID_MT7621 = 1,
 	ID_MT7531 = 2,
 	ID_MT7988 = 3,
+	ID_EN7581 = 4,
 };
 
 #define	NUM_TRGMII_CTRL			5
@@ -56,12 +57,44 @@ enum mt753x_id {
 #define  MT7531_CPU_PMAP_MASK		GENMASK(7, 0)
 #define  MT7531_CPU_PMAP(x)		FIELD_PREP(MT7531_CPU_PMAP_MASK, x)
 
-#define MT753X_MIRROR_REG(id)		((((id) == ID_MT7531) || ((id) == ID_MT7988)) ?	\
-					 MT7531_CFC : MT7530_MFC)
-#define MT753X_MIRROR_EN(id)		((((id) == ID_MT7531) || ((id) == ID_MT7988)) ?	\
-					 MT7531_MIRROR_EN : MIRROR_EN)
-#define MT753X_MIRROR_MASK(id)		((((id) == ID_MT7531) || ((id) == ID_MT7988)) ?	\
-					 MT7531_MIRROR_MASK : MIRROR_MASK)
+#define MT753X_MIRROR_REG(id)		((((id) == ID_MT7531) || ((id) == ID_MT7988) ||	\
+					  ((id) == ID_EN7581)) ? MT7531_CFC : MT7530_MFC)
+#define MT753X_MIRROR_EN(id)		((((id) == ID_MT7531) || ((id) == ID_MT7988) ||	\
+					  ((id) == ID_EN7581)) ? MT7531_MIRROR_EN : MIRROR_EN)
+#define MT753X_MIRROR_MASK(id)		((((id) == ID_MT7531) || ((id) == ID_MT7988) ||	\
+					  ((id) == ID_EN7581)) ? MT7531_MIRROR_MASK : MIRROR_MASK)
+
+/* Registers for IGMP and MLD frame control*/
+#define MT753X_IMC			0x1c
+#define  MT753X_MLD_MANG_FR_MASK	BIT(27)
+#define  MT753X_MLD_EG_TAG_MASK		GENMASK(18, 16)
+#define  MT753X_MLD_EG_TAG(x)		FIELD_PREP(MT753X_MLD_EG_TAG_MASK, x)
+#define  MT753X_IGMP_MANG_FR_MASK	BIT(11)
+#define  MT753X_IGMP_PORT_FW_MASK	GENMASK(2, 0)
+#define  MT753X_IGMP_EG_TAG(x)		FIELD_PREP(MT753X_IGMP_PORT_FW_MASK, x)
+
+enum mt753x_imc_port_fw {
+	MT753X_IMC_CPU_EXCLUDE = 4,
+	MT753X_IMC_CPU_INCLUDE = 5,
+	MT753X_IMC_CPU_ONLY = 6,
+	MT753X_IMC_DROP = 7,
+};
+
+/* Registers for ARP and PPP frame control*/
+#define MT753X_APC			0x20
+#define  MT753X_PPP_MANG_FR_MASK	BIT(27)
+#define  MT753X_PPP_EG_TAG_MASK		GENMASK(18, 16)
+#define  MT753X_PPP_EG_TAG(x)		FIELD_PREP(MT753X_PPP_EG_TAG_MASK, x)
+#define  MT753X_ARP_MANG_FR_MASK	BIT(11)
+#define  MT753X_ARP_PORT_FW_MASK	GENMASK(2, 0)
+#define  MT753X_ARP_EG_TAG(x)		FIELD_PREP(MT753X_ARP_PORT_FW_MASK, x)
+
+enum mt753x_apc_port_fw {
+	MT753X_APC_CPU_EXCLUDE = 4,
+	MT753X_APC_CPU_INCLUDE = 5,
+	MT753X_APC_CPU_ONLY = 6,
+	MT753X_APC_DROP = 7,
+};
 
 /* Registers for BPDU and PAE frame control*/
 #define MT753X_BPC			0x24
@@ -214,6 +247,22 @@ enum mt7530_vlan_egress_attr {
 #define  AGE_UNIT_MAX			0xfff
 #define  AGE_UNIT(x)			(AGE_UNIT_MASK & (x))
 
+/* Registers for DHCP and DHCP6 frame control*/
+#define MT753X_DPC			0xa4
+#define  MT753X_DHCP6_MANG_FR_MASK	BIT(27)
+#define  MT753X_DHCP6_EG_TAG_MASK	GENMASK(18, 16)
+#define  MT753X_DHCP6_EG_TAG(x)		FIELD_PREP(MT753X_DHCP6_EG_TAG_MASK, x)
+#define  MT753X_DHCP_MANG_FR_MASK	BIT(11)
+#define  MT753X_DHCP_PORT_FW_MASK	GENMASK(2, 0)
+#define  MT753X_DHCP_EG_TAG(x)		FIELD_PREP(MT753X_DHCP_PORT_FW_MASK, x)
+
+enum mt753x_dpc_port_fw {
+	MT753X_DPC_CPU_EXCLUDE = 4,
+	MT753X_DPC_CPU_INCLUDE = 5,
+	MT753X_DPC_CPU_ONLY = 6,
+	MT753X_DPC_DROP = 7,
+};
+
 /* Register for port STP state control */
 #define MT7530_SSP_P(x)			(0x2000 + ((x) * 0x100))
 #define  FID_PST(fid, state)		(((state) & 0x3) << ((fid) * 2))
@@ -364,6 +413,12 @@ enum mt7530_vlan_port_acc_frm {
 #define  MAX_RX_PKT_LEN_1552		0x2
 #define  MAX_RX_PKT_LEN_JUMBO		0x3
 
+#define MT7530_DGCR			0x30ec
+
+#define MT7530_CKGCR			0x30f0
+#define CFG_LNKDN_GLB			BIT(0)
+#define CFG_LNKDN_PORT			BIT(1)
+
 /* Register for MIB */
 #define MT7530_PORT_MIB_COUNTER(x)	(0x4000 + (x) * 0x100)
 #define MT7530_MIB_CCR			0x4fe0
@@ -491,6 +546,7 @@ enum mt7531_clk_skew {
 /* Register for TOP signal control */
 #define MT7530_TOP_SIG_CTRL		0x7808
 #define  TOP_SIG_CTRL_NORMAL		(BIT(17) | BIT(16))
+#define  PHY_MDC_CK_EN			BIT(0)
 
 #define MT7531_TOP_SIG_SR		0x780c
 #define  PAD_DUAL_SGMII_EN		BIT(1)
@@ -662,6 +718,13 @@ enum mt7531_clk_skew {
 		.offset = (_o),	\
 		.name = (_n),	\
 	}
+
+#define EN7581_CPORT_CFG		0xfc00
+#define  CPORT_FE2GSW_CRC_DIS		BIT(31)
+#define  CPORT_PAD_EN			BIT(26)
+#define  CPORT_FEP_XFC			BIT(25)
+#define  CPORT_FEQ_XFC			BIT(24)
+#define  CPORT_FE2GSW_IPG		GENMASK(15, 8)
 
 struct mt7530_mib_desc {
 	unsigned int size;
