@@ -2087,7 +2087,7 @@ mt7530_setup_irq(struct mt7530_priv *priv)
 		return priv->irq ? : -EINVAL;
 	}
 
-	if (priv->id == ID_MT7988)
+	if (priv->id == ID_MT7988 || priv->id == ID_EN7581)
 		priv->irq_domain = irq_domain_add_linear(np, MT7530_NUM_PHYS,
 							 &mt7988_irq_domain_ops,
 							 priv);
@@ -2946,7 +2946,8 @@ mt753x_conduit_state_change(struct dsa_switch *ds,
 	 * forwarded to the numerically smallest CPU port whose conduit
 	 * interface is up.
 	 */
-	if (priv->id != ID_MT7530 && priv->id != ID_MT7621)
+	if (priv->id != ID_MT7530 && priv->id != ID_MT7621 &&
+	    priv->id != ID_EN7581)
 		return;
 
 	mask = BIT(cpu_dp->index);
@@ -2976,6 +2977,62 @@ static int mt7988_setup(struct dsa_switch *ds)
 	mt7530_write(priv, MT7530_SYS_CTRL, SYS_CTRL_PHY_RST);
 
 	return mt7531_setup_common(ds);
+}
+
+static int en7581_setup(struct dsa_switch *ds)
+{
+	struct mt7530_priv *priv = ds->priv;
+	int i, err;
+
+	/* Reset the switch */
+	reset_control_assert(priv->rstc);
+	usleep_range(20, 50);
+	reset_control_deassert(priv->rstc);
+	usleep_range(20, 50);
+
+	/* Reset the switch PHYs */
+	mt7530_write(priv, MT7530_SYS_CTRL, SYS_CTRL_PHY_RST);
+
+	err = mt7531_setup_common(ds);
+	if (err)
+		return err;
+
+	/* IGMP and MLD config */
+	mt7530_rmw(priv, MT753X_IMC,
+		   MT753X_MLD_MANG_FR_MASK | MT753X_MLD_EG_TAG_MASK |
+		   MT753X_IGMP_MANG_FR_MASK | MT753X_IGMP_PORT_FW_MASK,
+		   MT753X_MLD_EG_TAG(MT753X_IMC_CPU_ONLY) |
+		   MT753X_IGMP_EG_TAG(MT753X_IMC_CPU_ONLY));
+	/* ARP and PPP config */
+	mt7530_rmw(priv, MT753X_APC,
+		   MT753X_PPP_MANG_FR_MASK | MT753X_PPP_EG_TAG_MASK |
+		   MT753X_ARP_MANG_FR_MASK | MT753X_ARP_PORT_FW_MASK,
+		   MT753X_PPP_EG_TAG(MT753X_APC_CPU_ONLY) |
+		   MT753X_ARP_EG_TAG(MT753X_APC_CPU_ONLY));
+	/* DHCP and DHCP6 config */
+	mt7530_rmw(priv, MT753X_DPC,
+		   MT753X_DHCP6_MANG_FR_MASK | MT753X_DHCP6_EG_TAG_MASK |
+		   MT753X_DHCP_MANG_FR_MASK | MT753X_DHCP_PORT_FW_MASK,
+		   MT753X_DHCP6_EG_TAG(MT753X_DPC_CPU_ONLY) |
+		   MT753X_DHCP_EG_TAG(MT753X_DPC_CPU_ONLY));
+
+	mt7530_clear(priv, MT7530_CKGCR, CFG_LNKDN_GLB | CFG_LNKDN_PORT);
+	mt7530_set(priv, EN7581_CPORT_CFG,
+		   CPORT_FE2GSW_CRC_DIS | CPORT_PAD_EN | CPORT_FEP_XFC);
+	mt7530_clear(priv, EN7581_CPORT_CFG, CPORT_FEQ_XFC);
+	mt7530_rmw(priv, EN7581_CPORT_CFG, CPORT_FE2GSW_IPG,
+		   FIELD_PREP(CPORT_FE2GSW_IPG, 0x2));
+	mt7530_write(priv, MT7530_DGCR, 0x2);
+
+	/* TRGMII setup */
+	for (i = 0; i < NUM_TRGMII_CTRL; i++)
+		mt7530_rmw(priv, MT7530_TRGMII_RD(i), RD_TAP_MASK, RD_TAP(1));
+	mt7530_clear(priv, MT7530_TOP_SIG_CTRL, PHY_MDC_CK_EN);
+	mt7530_write(priv, MT7530_MHWTRAP, 0x01017e8f);
+	mt7530_set(priv, MT7530_TOP_SIG_CTRL, PHY_MDC_CK_EN);
+	mt7530_rmw(priv, MT7530_P6ECR, P6_INTF_MODE_MASK, P6_INTF_MODE(1));
+
+	return 0;
 }
 
 const struct dsa_switch_ops mt7530_switch_ops = {
@@ -3054,6 +3111,16 @@ const struct mt753x_info mt753x_table[] = {
 		.id = ID_MT7988,
 		.pcs_ops = &mt7530_pcs_ops,
 		.sw_setup = mt7988_setup,
+		.phy_read_c22 = mt7531_ind_c22_phy_read,
+		.phy_write_c22 = mt7531_ind_c22_phy_write,
+		.phy_read_c45 = mt7531_ind_c45_phy_read,
+		.phy_write_c45 = mt7531_ind_c45_phy_write,
+		.mac_port_get_caps = mt7988_mac_port_get_caps,
+	},
+	[ID_EN7581] = {
+		.id = ID_EN7581,
+		.pcs_ops = &mt7530_pcs_ops,
+		.sw_setup = en7581_setup,
 		.phy_read_c22 = mt7531_ind_c22_phy_read,
 		.phy_write_c22 = mt7531_ind_c22_phy_write,
 		.phy_read_c45 = mt7531_ind_c45_phy_read,
