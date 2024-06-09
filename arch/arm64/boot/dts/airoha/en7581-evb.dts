@@ -24,3 +24,21 @@
 		reg = <0x0 0x80000000 0x2 0x00000000>;
 	};
 };
+
+&pio {
+	gpio-ranges = <&pio 0 13 47>;
+
+	pcie0_rst_pins: pcie0-rst-pins {
+		conf {
+			pins = "pcie_reset0";
+			drive-open-drain = <1>;
+		};
+	};
+
+	pcie1_rst_pins: pcie1-rst-pins {
+		conf {
+			pins = "pcie_reset1";
+			drive-open-drain = <1>;
+		};
+	};
+};
