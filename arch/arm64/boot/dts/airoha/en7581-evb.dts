@@ -4,6 +4,7 @@
 /* Bootloader installs ATF here */
 /memreserve/ 0x80000000 0x200000;
 
+#include <dt-bindings/leds/common.h>
 #include "en7581.dtsi"
 
 / {
@@ -41,6 +42,34 @@
 			drive-open-drain = <1>;
 		};
 	};
+
+	gswp1_led0_pins: gswp1-led0-pins {
+		mux {
+			function = "led";
+			pins = "gpio33";
+		};
+	};
+
+	gswp2_led0_pins: gswp2-led0-pins {
+		mux {
+			function = "led";
+			pins = "gpio34";
+		};
+	};
+
+	gswp3_led0_pins: gswp3-led0-pins {
+		mux {
+			function = "led";
+			pins = "gpio35";
+		};
+	};
+
+	gswp4_led0_pins: gswp4-led0-pins {
+		mux {
+			function = "led";
+			pins = "gpio42";
+		};
+	};
 };
 
 &pcie0 {
@@ -64,5 +93,45 @@
 };
 
 &switch {
+	status = "okay";
+};
+
+&gsw_phy1 {
+	pinctrl-names = "led";
+	pinctrl-0 = <&gswp1_led0_pins>;
+	status = "okay";
+};
+
+&gsw_phy1_led0 {
+	status = "okay";
+};
+
+&gsw_phy2 {
+	pinctrl-names = "led";
+	pinctrl-0 = <&gswp2_led0_pins>;
+	status = "okay";
+};
+
+&gsw_phy2_led0 {
+	status = "okay";
+};
+
+&gsw_phy3 {
+	pinctrl-names = "led";
+	pinctrl-0 = <&gswp3_led0_pins>;
+	status = "okay";
+};
+
+&gsw_phy3_led0 {
+	status = "okay";
+};
+
+&gsw_phy4 {
+	pinctrl-names = "led";
+	pinctrl-0 = <&gswp4_led0_pins>;
+	status = "okay";
+};
+
+&gsw_phy4_led0 {
 	status = "okay";
 };
