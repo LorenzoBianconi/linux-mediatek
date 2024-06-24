@@ -13,7 +13,6 @@
 #include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/tcp.h>
-#include <net/dsa.h>
 #include <net/page_pool/helpers.h>
 #include <uapi/linux/ppp_defs.h>
 #include "airoha_eth.h"
@@ -461,6 +460,9 @@ static void airoha_fe_crsn_qsel_init(struct airoha_eth *eth)
 
 static int airoha_fe_init(struct airoha_eth *eth)
 {
+	/* Enable Rx DSA tagging */
+	airoha_fe_set(eth, REG_GDM1_INGRESS_CFG, GDM1_STAG_EN_MASK);
+
 	airoha_fe_maccr_init(eth);
 
 	/* PSE IQ reserve */
@@ -1242,11 +1244,6 @@ static int airoha_dev_open(struct net_device *dev)
 {
 	struct airoha_eth *eth = netdev_priv(dev);
 	int err;
-
-	if (netdev_uses_dsa(dev))
-		airoha_fe_set(eth, REG_GDM1_INGRESS_CFG, GDM1_STAG_EN_MASK);
-	else
-		airoha_fe_clear(eth, REG_GDM1_INGRESS_CFG, GDM1_STAG_EN_MASK);
 
 	netif_tx_start_all_queues(dev);
 	err = airoha_set_gdm_ports(eth, true);
