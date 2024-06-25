@@ -3,6 +3,7 @@
  * Copyright (C) 2024 Lorenzo Bianconi <lorenzo@kernel.org>
  */
 
+#define AIROHA_MAX_NUM_GDM_PORTS	1
 #define AIROHA_MAX_NUM_RSTS		3
 #define AIROHA_MAX_NUM_XSI_RSTS		5
 #define AIROHA_MAX_MTU			2000
@@ -571,7 +572,7 @@
 #define QDMA_DESC_LEN_MASK		GENMASK(15, 0)
 /* DATA */
 #define QDMA_DESC_NEXT_ID_MASK		GENMASK(15, 0)
-/* MSG0 */
+/* TX MSG0 */
 #define QDMA_ETH_TXMSG_MIC_IDX_MASK	BIT(30)
 #define QDMA_ETH_TXMSG_SP_TAG_MASK	GENMASK(29, 14)
 #define QDMA_ETH_TXMSG_ICO_MASK		BIT(13)
@@ -582,7 +583,7 @@
 #define QDMA_ETH_TXMSG_OAM_MASK		BIT(8)
 #define QDMA_ETH_TXMSG_CHAN_MASK	GENMASK(7, 3)
 #define QDMA_ETH_TXMSG_QUEUE_MASK	GENMASK(2, 0)
-/* MSG1 */
+/* TX MSG1 */
 #define QDMA_ETH_TXMSG_NO_DROP		BIT(31)
 #define QDMA_ETH_TXMSG_METER_MASK	GENMASK(30, 24)	/* 0x7f means do not apply meters */
 #define QDMA_ETH_TXMSG_FPORT_MASK	GENMASK(23, 20)
@@ -592,6 +593,17 @@
 #define QDMA_ETH_TXMSG_PTP_MASK		BIT(12)
 #define QDMA_ETH_TXMSG_ACNT_G1_MASK	GENMASK(10, 6)	/* 0x1f means do not count */
 #define QDMA_ETH_TXMSG_ACNT_G0_MASK	GENMASK(5, 0)	/* 0x3f means do not count */
+
+/* RX MSG1 */
+#define QDMA_ETH_RXMSG_DEI_MASK		BIT(31)
+#define QDMA_ETH_RXMSG_IP6_MASK		BIT(30)
+#define QDMA_ETH_RXMSG_IP4_MASK		BIT(29)
+#define QDMA_ETH_RXMSG_IP4F_MASK	BIT(28)
+#define QDMA_ETH_RXMSG_L4_VALID_MASK	BIT(27)
+#define QDMA_ETH_RXMSG_L4F_MASK		BIT(26)
+#define QDMA_ETH_RXMSG_SPORT_MASK	GENMASK(25, 21)
+#define QDMA_ETH_RXMSG_CRSN_MASK	GENMASK(20, 16)
+#define QDMA_ETH_RXMSG_PPE_ENTRY_MASK	GENMASK(15, 0)
 
 struct airoha_qdma_desc {
 	__le32 rsv;
@@ -752,8 +764,14 @@ struct airoha_tx_irq_queue {
 	u16 head;
 };
 
+struct airoha_gdm_port {
+	struct net_device *dev;
+	struct airoha_eth *eth;
+	int id;
+};
+
 struct airoha_eth {
-	struct net_device *net_dev;
+	struct device *dev;
 
 	unsigned long state;
 
@@ -767,6 +785,9 @@ struct airoha_eth {
 	struct reset_control_bulk_data rsts[AIROHA_MAX_NUM_RSTS];
 	struct reset_control_bulk_data xsi_rsts[AIROHA_MAX_NUM_XSI_RSTS];
 
+	struct airoha_gdm_port *ports[AIROHA_MAX_NUM_GDM_PORTS];
+
+	struct net_device *napi_dev;
 	struct airoha_queue q_tx[AIROHA_NUM_TX_RING];
 	struct airoha_queue q_rx[AIROHA_NUM_RX_RING];
 
@@ -779,7 +800,6 @@ struct airoha_eth {
 	} hfwd;
 
 	u64 *hw_stats;
-
 	struct dentry *debugfs_dir;
 };
 
