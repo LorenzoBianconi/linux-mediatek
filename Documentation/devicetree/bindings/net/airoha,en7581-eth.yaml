@@ -14,7 +14,7 @@ maintainers:
 
 description:
   The frame engine ethernet controller can be found on Airoha SoCs.
-  These SoCs have dual GMAC ports.
+  These SoCs have multi-GMAC ports.
 
 properties:
   compatible:
@@ -70,16 +70,17 @@ patternProperties:
   "^mac@[1-4]$":
     type: object
     unevaluatedProperties: false
-    allOf:
-      - $ref: ethernet-controller.yaml#
+    $ref: ethernet-controller.yaml#
     description:
-      Ethernet MAC node
+      Ethernet GMAC port associated to the MAC controller
     properties:
       compatible:
         const: airoha,eth-mac
 
       reg:
-        maxItems: 1
+        minimum: 1
+        maximum: 4
+        description: GMAC port ID
 
     required:
       - reg
@@ -140,32 +141,6 @@ examples:
         mac1: mac@1 {
           compatible = "airoha,eth-mac";
           reg = <1>;
-          phy-mode = "2500base-x";
-          phy-handle = <&phy0>;
-        };
-
-        mac2: mac@2 {
-          compatible = "airoha,eth-mac";
-          reg = <2>;
-          phy-mode = "2500base-x";
-          phy-handle = <&phy1>;
-        };
-      };
-
-      mdio: mdio-bus {
-        #address-cells = <1>;
-        #size-cells = <0>;
-
-        phy0: ethernet-phy@0 {
-            compatible = "ethernet-phy-id67c9.de0a";
-            reg = <0>;
-            phy-mode = "2500base-x";
-        };
-
-        phy1: ethernet-phy@1 {
-            compatible = "ethernet-phy-id67c9.de0a";
-            reg = <1>;
-            phy-mode = "2500base-x";
         };
       };
     };
