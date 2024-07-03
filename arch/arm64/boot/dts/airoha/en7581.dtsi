@@ -184,6 +184,15 @@
 			#gpio-cells = <2>;
 		};
 
+		pwm: pwm@1fbf0224 {
+			compatible = "airoha,en7581-pwm";
+			reg = <0x0 0x1fbf0224 0x0 0x10>,
+			      <0x0 0x1fbf0238 0x0 0x28>,
+			      <0x0 0x1fbf0298 0x0 0x8>;
+			#pwm-cells = <3>;
+			status = "disabled";
+		};
+
 		snfi: spi@1fa10000 {
 			compatible = "airoha,en7581-snand";
 			reg = <0x0 0x1fa10000 0x0 0x140>,
