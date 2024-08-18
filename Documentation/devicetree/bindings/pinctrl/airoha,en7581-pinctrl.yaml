@@ -328,19 +328,12 @@ patternProperties:
             maxItems: 58
 
           bias-disable: true
-
           bias-pull-up: true
-
           bias-pull-down: true
-
           input-enable: true
-
           output-enable: true
-
           output-low: true
-
           output-high: true
-
           drive-open-drain: true
 
           drive-strength:
