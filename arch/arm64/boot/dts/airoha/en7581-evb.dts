@@ -68,6 +68,17 @@
 &en7581_pinctrl {
 	gpio-ranges = <&en7581_pinctrl 0 13 47>;
 
+	mdio_pins: mdio-pins {
+		mux {
+			function = "mdio";
+			groups = "mdio";
+		};
+		conf {
+			pins = "gpio2";
+			output-high;
+		};
+	};
+
 	pcie0_rst_pins: pcie0-rst-pins {
 		conf {
 			pins = "pcie_reset0";
@@ -104,5 +115,11 @@
 };
 
 &gdm1 {
+	status = "okay";
+};
+
+&switch {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mdio_pins>;
 	status = "okay";
 };
